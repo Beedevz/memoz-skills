@@ -1,0 +1,10 @@
+{
+  "capabilities": [
+    {
+      "id": "memoz-task-flow",
+      "core": "core/task-flow.md",
+      "title": "Memoz task flow",
+      "description": "Find the active task from the project's .memoz/tasks.json declaration and work on exactly one. Use when starting, continuing or closing work in a project tracked with Memoz. Never guesses where work lives."
+    }
+  ]
+}
