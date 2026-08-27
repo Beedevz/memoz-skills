@@ -11,6 +11,12 @@
       "core": "core/closure.md",
       "title": "Memoz closure writer",
       "description": "Write the closure record when a piece of work finishes: what changed, decisions and rejected options, measurements with their conditions, falsified assumptions, and criteria that could not be closed. Use when finishing a task, sub-task or release. Refuses to close on a missing field."
+    },
+    {
+      "id": "memoz-pattern-log",
+      "core": "core/pattern-log.md",
+      "title": "Memoz recurring-mistake log",
+      "description": "Record a mistake that has happened before, in one place, with a count. Use when something that just went wrong feels familiar. Asks whether it is a new shape or another occurrence rather than deciding alone."
     }
   ]
 }
