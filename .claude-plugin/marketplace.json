@@ -1,0 +1,30 @@
+{
+  "name": "memoz-skills",
+  "owner": {
+    "name": "Beedevz LLC",
+    "url": "https://github.com/Beedevz"
+  },
+  "metadata": {
+    "description": "Memoz agent skills — engineering discipline backed by your own Memoz vault.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "memoz",
+      "source": "./",
+      "description": "Memoz agent skills — engineering discipline backed by your own Memoz vault.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Beedevz LLC",
+        "url": "https://github.com/Beedevz"
+      },
+      "keywords": [
+        "memoz",
+        "knowledge-base",
+        "mcp",
+        "engineering-discipline",
+        "task-management"
+      ]
+    }
+  ]
+}

@@ -44,8 +44,23 @@ gemini skills install https://github.com/Beedevz/memoz-skills.git --path skills/
 > Assist accounts and points users to the Antigravity suite. If that applies to you, use the
 > Antigravity command above instead.
 
-**Claude Code** — copy a skill directory into `~/.claude/skills/` (user scope) or
-`.claude/skills/` (project scope). A packaged plugin is planned.
+**Claude Code**
+
+```bash
+claude plugin marketplace add Beedevz/memoz-skills
+claude plugin install memoz@memoz-skills
+```
+
+Data access is again a separate step, and again name the vault explicitly:
+
+```bash
+claude mcp add memoz -- memoz --vault /path/to/your/vault mcp
+```
+
+> The plugin deliberately does **not** ship an MCP server entry. It could, but only by hardcoding
+> a command with no vault — which falls back to whichever vault is configured as the default, and
+> that is exactly the silent mismatch warned about above. A one-line step you can see beats a
+> configuration that quietly points somewhere else.
 
 **Codex CLI** — copy the rendered prompt into `~/.codex/prompts/`. See `hosts/codex/`.
 
@@ -104,12 +119,14 @@ not a record.
 ## Layout
 
 ```
-core/     host-agnostic discipline text — the single source
-skills/   SKILL.md form (Claude Code + Gemini CLI share this shape)
-hosts/    per-host renders that are not SKILL.md (e.g. Codex prompts)
+core/            host-agnostic discipline text — the single source
+plugin.json      plugin identity — the single source for every manifest
+skills/          SKILL.md form (Claude Code + Gemini CLI + Antigravity share this shape)
+hosts/           per-host renders that are not SKILL.md (e.g. Codex prompts)
+.claude-plugin/  Claude Code plugin + marketplace manifests
 ```
 
-`skills/` and `hosts/` are **generated from `core/`** — do not hand-edit them. Agent instructions
+`skills/`, `hosts/` and `.claude-plugin/` are **generated** — do not hand-edit them. Agent instructions
 maintained separately per host drift apart quickly, and the drift is silent: the same command
 behaves differently depending on which tool you happen to be using. One source, rendered per host.
 

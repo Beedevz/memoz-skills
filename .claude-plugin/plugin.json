@@ -14,5 +14,6 @@
     "mcp",
     "engineering-discipline",
     "task-management"
-  ]
+  ],
+  "skills": "./skills/"
 }

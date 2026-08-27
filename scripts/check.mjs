@@ -36,13 +36,13 @@ async function tree(dir) {
 
 // Render into a scratch copy so the working tree is never touched by the check itself.
 const scratch = mkdtempSync(join(tmpdir(), "memoz-skills-check-"));
-for (const item of ["core", "skills.json", "scripts"]) {
+for (const item of ["core", "skills.json", "scripts", "plugin.json"]) {
   cpSync(join(root, item), join(scratch, item), { recursive: true });
 }
 execFileSync(process.execPath, [join(scratch, "scripts", "render.mjs")], { stdio: "ignore" });
 
 let farklar = 0;
-for (const alan of ["skills", "hosts"]) {
+for (const alan of ["skills", "hosts", ".claude-plugin"]) {
   const beklenen = await tree(join(scratch, alan));
   const mevcut = await tree(join(root, alan));
   for (const [p, icerik] of beklenen) {
