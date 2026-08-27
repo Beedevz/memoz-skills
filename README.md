@@ -113,8 +113,9 @@ quietly adopt **another project's** tasks. Reachability is a *capability*; owner
 | `memoz-debugging` | Eliminate, don't guess — and keep the hypotheses that were **falsified** |
 | `memoz-verification` | Evidence before the claim — and the claim and the check must match |
 | `memoz-planning` | Pieces you can finish, criteria you can **run**, and a stated boundary |
-Each ends by writing into your knowledge layer: a process that leaves no trace is a conversation,
-not a record.
+
+Each one ends by writing into your knowledge layer: a process that leaves no trace is a
+conversation, not a record.
 
 ## Layout
 
