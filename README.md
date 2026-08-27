@@ -20,11 +20,19 @@ Data access is a second, one-line step — the plugin format does not carry an M
 build:
 
 ```bash
-agy mcp add memoz memoz mcp
+agy mcp add memoz memoz --vault /path/to/your/vault mcp
 ```
 
-Requires the `memoz` CLI on your `PATH`. It resolves the vault from `defaultVault` in
-`~/.memoz/config.json`, or takes an explicit one: `agy mcp add memoz memoz --vault /path/to/vault mcp`.
+Requires the `memoz` CLI on your `PATH`.
+
+**Name the vault explicitly.** Without `--vault` the CLI falls back to `defaultVault` in
+`~/.memoz/config.json`, which is often a *different* vault from the one your project is about —
+and nothing warns you. The skills then look for tasks in a vault that has none, and report that
+there is no work to do.
+
+⚠️ The `vault` field in `.memoz/tasks.json` and the vault your MCP server points at are **two
+separate settings**. They can disagree silently. If a skill says there are no tasks while you can
+see them in the app, check that they agree first.
 
 **Gemini CLI**
 
