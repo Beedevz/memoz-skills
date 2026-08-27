@@ -59,6 +59,12 @@
       "core": "core/verification.md",
       "title": "Memoz verification before completion",
       "description": "Produce the evidence before claiming a piece of work is done, fixed or working: state the claim, run the thing that would disprove it, confirm the tooling actually ran, and report what remains unverified. Use before finishing work, committing, or reporting a result."
+    },
+    {
+      "id": "memoz-planning",
+      "core": "core/planning.md",
+      "title": "Memoz planning",
+      "description": "Break understood work into pieces that can be closed one at a time, each with a completion criterion you can actually run, plus the exclusions and the open questions. Use after the approach is settled and before implementing."
     }
   ]
 }
