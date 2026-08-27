@@ -91,9 +91,12 @@ quietly adopt **another project's** tasks. Reachability is a *capability*; owner
 | `memoz-closure` | Record what was learned before the context is gone — including what was **falsified** |
 | `memoz-pattern-log` | Count the mistakes that repeat — one place, one count, recognisable early |
 | `memoz-mutation` | Prove a test locks something: break it on purpose. *Not applied* is not a pass |
+| `memoz-decision` | The decision **and the options rejected**, with the ground for each |
+| `memoz-measurement` | A number with its conditions — and what it does not show |
+| `memoz-friction` | What got in the way, recorded at the moment it happened |
 
-More are planned: pattern log, mutation discipline, decision/friction/measurement capture, and
-process skills such as brainstorming and systematic debugging.
+More are planned: process skills such as brainstorming and systematic debugging. Each will end by
+writing into your knowledge layer — a process that leaves no trace is a conversation, not a record.
 
 ## Layout
 

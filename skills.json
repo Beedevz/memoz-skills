@@ -23,6 +23,24 @@
       "core": "core/mutation.md",
       "title": "Memoz mutation discipline",
       "description": "Verify that a new test actually locks what it claims: break the code on purpose and watch it fail. Use after adding a test for a specific defect. Distinguishes died, survived and not-applied — the last is not a result."
+    },
+    {
+      "id": "memoz-decision",
+      "core": "core/decision.md",
+      "title": "Memoz decision record",
+      "description": "Record a decision together with the options rejected and the ground each was rejected on, plus what observation would reopen it. Use when a choice is made that outlives the task."
+    },
+    {
+      "id": "memoz-measurement",
+      "core": "core/measurement.md",
+      "title": "Memoz measurement record",
+      "description": "Record a number with the conditions that produced it and what it does not show. Use when benchmarking or measuring anything that will be quoted later."
+    },
+    {
+      "id": "memoz-friction",
+      "core": "core/friction.md",
+      "title": "Memoz friction record",
+      "description": "Record what got in the way while using something: goal, what happened, what you expected, the workaround, and the decision. Use at the moment of friction, not at the end of the session."
     }
   ]
 }
