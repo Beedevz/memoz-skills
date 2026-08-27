@@ -17,6 +17,12 @@
       "core": "core/pattern-log.md",
       "title": "Memoz recurring-mistake log",
       "description": "Record a mistake that has happened before, in one place, with a count. Use when something that just went wrong feels familiar. Asks whether it is a new shape or another occurrence rather than deciding alone."
+    },
+    {
+      "id": "memoz-mutation",
+      "core": "core/mutation.md",
+      "title": "Memoz mutation discipline",
+      "description": "Verify that a new test actually locks what it claims: break the code on purpose and watch it fail. Use after adding a test for a specific defect. Distinguishes died, survived and not-applied — the last is not a result."
     }
   ]
 }
