@@ -47,6 +47,12 @@
       "core": "core/brainstorming.md",
       "title": "Memoz brainstorming",
       "description": "Work out what is wanted before building it: search the knowledge layer for prior decisions, find the intent under the request, widen the options, name the constraint that decides it, and stop at a decision record. Use before implementing a feature or picking an approach."
+    },
+    {
+      "id": "memoz-debugging",
+      "core": "core/debugging.md",
+      "title": "Memoz systematic debugging",
+      "description": "Find a defect by elimination and keep what the elimination taught: search the knowledge layer first, reproduce before explaining, write hypotheses down before testing them, never conclude from absence, distrust the instrument, and prove the cause by putting the bug back. Use on any failure whose cause is not obvious."
     }
   ]
 }

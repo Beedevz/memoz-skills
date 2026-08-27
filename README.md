@@ -95,8 +95,9 @@ quietly adopt **another project's** tasks. Reachability is a *capability*; owner
 | `memoz-measurement` | A number with its conditions — and what it does not show |
 | `memoz-friction` | What got in the way, recorded at the moment it happened |
 | `memoz-brainstorming` | Ask the knowledge layer **first** — a settled question stays settled |
+| `memoz-debugging` | Eliminate, don't guess — and keep the hypotheses that were **falsified** |
 
-More process skills are planned — systematic debugging, planning, verification before completion.
+More process skills are planned — planning, and verification before completion.
 Each ends by writing into your knowledge layer: a process that leaves no trace is a conversation,
 not a record.
 
