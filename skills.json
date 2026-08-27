@@ -53,6 +53,12 @@
       "core": "core/debugging.md",
       "title": "Memoz systematic debugging",
       "description": "Find a defect by elimination and keep what the elimination taught: search the knowledge layer first, reproduce before explaining, write hypotheses down before testing them, never conclude from absence, distrust the instrument, and prove the cause by putting the bug back. Use on any failure whose cause is not obvious."
+    },
+    {
+      "id": "memoz-verification",
+      "core": "core/verification.md",
+      "title": "Memoz verification before completion",
+      "description": "Produce the evidence before claiming a piece of work is done, fixed or working: state the claim, run the thing that would disprove it, confirm the tooling actually ran, and report what remains unverified. Use before finishing work, committing, or reporting a result."
     }
   ]
 }
