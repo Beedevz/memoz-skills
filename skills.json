@@ -41,6 +41,12 @@
       "core": "core/friction.md",
       "title": "Memoz friction record",
       "description": "Record what got in the way while using something: goal, what happened, what you expected, the workaround, and the decision. Use at the moment of friction, not at the end of the session."
+    },
+    {
+      "id": "memoz-brainstorming",
+      "core": "core/brainstorming.md",
+      "title": "Memoz brainstorming",
+      "description": "Work out what is wanted before building it: search the knowledge layer for prior decisions, find the intent under the request, widen the options, name the constraint that decides it, and stop at a decision record. Use before implementing a feature or picking an approach."
     }
   ]
 }
