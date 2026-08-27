@@ -14,6 +14,12 @@ work lives is something your project *declares*; the skills read that declaratio
 gemini skills install https://github.com/Beedevz/memoz-skills.git --path skills/memoz-task-flow
 ```
 
+**Antigravity CLI**
+
+```bash
+agy plugin install https://github.com/Beedevz/memoz-skills.git
+```
+
 **Claude Code** — copy a skill directory into `~/.claude/skills/` (user scope) or
 `.claude/skills/` (project scope). A packaged plugin is planned.
 

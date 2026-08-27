@@ -1,0 +1,7 @@
+{
+  "name": "memoz",
+  "version": "0.1.0",
+  "description": "Memoz agent skills — engineering discipline backed by your own Memoz vault.",
+  "homepage": "https://github.com/Beedevz/memoz-skills",
+  "license": "MIT"
+}
