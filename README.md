@@ -16,6 +16,16 @@ agy plugin install https://github.com/Beedevz/memoz-skills.git
 
 Installs the whole repository as a plugin; the skills are picked up automatically.
 
+Data access is a second, one-line step — the plugin format does not carry an MCP server on this
+build:
+
+```bash
+agy mcp add memoz memoz mcp
+```
+
+Requires the `memoz` CLI on your `PATH`. It resolves the vault from `defaultVault` in
+`~/.memoz/config.json`, or takes an explicit one: `agy mcp add memoz memoz --vault /path/to/vault mcp`.
+
 **Gemini CLI**
 
 ```bash
@@ -31,8 +41,9 @@ gemini skills install https://github.com/Beedevz/memoz-skills.git --path skills/
 
 **Codex CLI** — copy the rendered prompt into `~/.codex/prompts/`. See `hosts/codex/`.
 
-> Data access is separate: Memoz ships an MCP server. Connect it from the Memoz app
-> (Settings → MCP) for Claude Desktop/Code, Codex, Gemini, Cursor, VS Code.
+> Data access is separate from the skills. Memoz ships an MCP server; the Memoz app generates
+> the right configuration per host (Settings → MCP) for Claude Desktop/Code, Codex, Gemini,
+> Cursor and VS Code.
 
 ## Declare where your work lives
 
