@@ -78,7 +78,13 @@ the vault it is serving in the instructions it sends at connection time; compare
 declared `vault`.
 
 - **They agree** → proceed.
-- **They disagree, or the server does not say** → **stop and tell the user.** Name both values.
+- **They disagree** → **stop and tell the user.** Name both values; do not pick one.
+- **The server does not report a vault** → say so once, then continue. Older servers do not
+  report it, and treating silence as a mismatch would block every project running one.
+
+⚠️ Not being able to check is not the same as failing the check. Conflating them turns a missing
+capability into a wall — and the wall appears for exactly the users who have not updated yet,
+which is most of them for most of the time.
 
 ⚠️ Never report "no tasks" on an unverified backend. This failure is silent by construction: the
 server answers correctly, the query is well-formed, and the result is genuinely empty — because
