@@ -5,6 +5,12 @@
       "core": "core/task-flow.md",
       "title": "Memoz task flow",
       "description": "Find the active task from the project's .memoz/tasks.json declaration and work on exactly one. Use when starting, continuing or closing work in a project tracked with Memoz. Never guesses where work lives."
+    },
+    {
+      "id": "memoz-closure",
+      "core": "core/closure.md",
+      "title": "Memoz closure writer",
+      "description": "Write the closure record when a piece of work finishes: what changed, decisions and rejected options, measurements with their conditions, falsified assumptions, and criteria that could not be closed. Use when finishing a task, sub-task or release. Refuses to close on a missing field."
     }
   ]
 }

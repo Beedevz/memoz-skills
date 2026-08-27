@@ -88,9 +88,10 @@ quietly adopt **another project's** tasks. Reachability is a *capability*; owner
 | skill | what it enforces |
 |---|---|
 | `memoz-task-flow` | Find the active task from the declaration; never invent task files |
+| `memoz-closure` | Record what was learned before the context is gone — including what was **falsified** |
 
-More are planned: closure writer (mandatory *falsified assumptions* field), pattern log,
-mutation discipline, decision/friction/measurement capture.
+More are planned: pattern log, mutation discipline, decision/friction/measurement capture, and
+process skills such as brainstorming and systematic debugging.
 
 ## Layout
 
