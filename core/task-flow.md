@@ -68,6 +68,27 @@ Decision order:
 ⚠️ Step 2 is a bug fix. A version that looked only for `-active.md` reported "no active task" in a
 repository holding ten live task files, and exited.
 
+## 2c. Check that the backend actually serves the declared vault
+
+When `backend` is `vault`, two settings answer the same question and they do **not** consult each
+other: the `vault` field in the declaration, and the vault the data server was pointed at.
+
+Before concluding that there is no work to do, check that they agree. A Memoz MCP server reports
+the vault it is serving in the instructions it sends at connection time; compare that with the
+declared `vault`.
+
+- **They agree** → proceed.
+- **They disagree, or the server does not say** → **stop and tell the user.** Name both values.
+
+⚠️ Never report "no tasks" on an unverified backend. This failure is silent by construction: the
+server answers correctly, the query is well-formed, and the result is genuinely empty — because
+it was asked in the wrong place. An empty answer and a wrong-place answer look identical, so the
+only defence is checking before you conclude.
+
+⚠️ Measured, not hypothetical: a server started without an explicit vault fell back to a
+configured default that was a *different* vault, and the tooling reported "no work to do" while
+the tasks were plainly visible in the app.
+
 ## 3. Reality check before writing code
 
 Verify the selected task's checklist **against the code**, not against the checklist's own claims:

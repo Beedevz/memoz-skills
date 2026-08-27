@@ -105,8 +105,11 @@ maintained separately per host drift apart quickly, and the drift is silent: the
 behaves differently depending on which tool you happen to be using. One source, rendered per host.
 
 ```bash
-node scripts/render.mjs
+node scripts/render.mjs   # regenerate
+node scripts/check.mjs    # fail if the generated files drift from core/
 ```
+
+`check.mjs` runs in CI, so a hand-edit cannot quietly survive.
 
 ## License
 
