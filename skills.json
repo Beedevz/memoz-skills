@@ -65,6 +65,31 @@
       "core": "core/planning.md",
       "title": "Memoz planning",
       "description": "Break understood work into pieces that can be closed one at a time, each with a completion criterion you can actually run, plus the exclusions and the open questions. Use after the approach is settled and before implementing."
+    },
+    {
+      "id": "memoz-parallel-work",
+      "core": "core/parallel-work.md",
+      "title": "Memoz parallel work",
+      "description": "Orchestrate several pieces of work at once: one worktree, branch and task note per piece; check file overlap and ask before running overlapping work in parallel; start implementer and independent reviewer agents; re-verify every claim yourself; merge shared hot files in order and always regenerate them. Use when splitting work across agents or worktrees."
+    }
+  ],
+  "agents": [
+    {
+      "id": "memoz-implementer",
+      "core": "core/agents/implementer.md",
+      "title": "Memoz implementer",
+      "description": "Implements one piece of work in its own worktree and writes its report into the task note. Use when an orchestrator hands off a single piece; the task note, branch and owned files are given in the prompt. Does not push, merge or change task status.",
+      "model": "sonnet",
+      "color": "blue"
+    },
+    {
+      "id": "memoz-reviewer",
+      "core": "core/agents/reviewer.md",
+      "title": "Memoz reviewer",
+      "description": "Reviews one branch's diff independently and adversarially, asking what contract the change breaks that the compiler and tests cannot see. Use after an implementer finishes and before the orchestrator asks a human to approve. Does not change code; never reads the task note before forming its own view.",
+      "model": "opus",
+      "color": "red",
+      "tools": "Read, Grep, Glob, Bash, mcp__memoz__append_note"
     }
   ]
 }

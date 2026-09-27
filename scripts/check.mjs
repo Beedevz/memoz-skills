@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Fails if anything under skills/ or hosts/ differs from what render.mjs produces from core/.
+// Fails if anything under skills/, hosts/, agents/ or .claude-plugin/ differs from what render.mjs
+// produces from core/.
 //
 // The README promises those directories are generated. A promise no one checks is not a
 // constraint: a hand-edit would survive, and the next render would silently revert it — the
@@ -41,29 +42,29 @@ for (const item of ["core", "skills.json", "scripts", "plugin.json"]) {
 }
 execFileSync(process.execPath, [join(scratch, "scripts", "render.mjs")], { stdio: "ignore" });
 
-let farklar = 0;
-for (const alan of ["skills", "hosts", ".claude-plugin"]) {
-  const beklenen = await tree(join(scratch, alan));
-  const mevcut = await tree(join(root, alan));
-  for (const [p, icerik] of beklenen) {
-    if (!mevcut.has(p)) {
-      console.error(`missing: ${alan}/${p}`);
-      farklar++;
-    } else if (mevcut.get(p) !== icerik) {
-      console.error(`stale:   ${alan}/${p}`);
-      farklar++;
+let differences = 0;
+for (const area of ["skills", "hosts", ".claude-plugin", "agents"]) {
+  const expected = await tree(join(scratch, area));
+  const actual = await tree(join(root, area));
+  for (const [p, content] of expected) {
+    if (!actual.has(p)) {
+      console.error(`missing: ${area}/${p}`);
+      differences++;
+    } else if (actual.get(p) !== content) {
+      console.error(`stale:   ${area}/${p}`);
+      differences++;
     }
   }
-  for (const p of mevcut.keys()) {
-    if (!beklenen.has(p)) {
-      console.error(`extra:   ${alan}/${p}`);
-      farklar++;
+  for (const p of actual.keys()) {
+    if (!expected.has(p)) {
+      console.error(`extra:   ${area}/${p}`);
+      differences++;
     }
   }
 }
 
-if (farklar > 0) {
-  console.error(`\n${farklar} file(s) differ from core/. Edit core/ and run: node scripts/render.mjs`);
+if (differences > 0) {
+  console.error(`\n${differences} file(s) differ from core/. Edit core/ and run: node scripts/render.mjs`);
   process.exit(1);
 }
 console.log("generated files match core/");

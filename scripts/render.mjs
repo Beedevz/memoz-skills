@@ -26,7 +26,7 @@ function scalar(v) {
   return `"${String(v).replace(/\s+/g, " ").trim().replace(/"/g, '\\"')}"`;
 }
 
-for (const out of ["skills", "hosts", ".claude-plugin"]) {
+for (const out of ["skills", "hosts", ".claude-plugin", "agents"]) {
   await rm(join(root, out), { recursive: true, force: true });
 }
 
@@ -47,6 +47,25 @@ for (const c of manifest.capabilities) {
   await writeFile(join(codexDir, `${c.id}.md`), `${banner(c.core)}\n# ${c.title}\n\n${body}`);
 
   console.log(`${c.id}: skills/${c.id}/SKILL.md · hosts/codex/${c.id}.md`);
+}
+
+// Agent roles — used by the parallel-work skill. Claude Code picks up `agents/*.md` at the plugin
+// root by itself (no manifest field; the same layout the official feature-dev plugin uses).
+// Codex has no sub-agent concept, so the role text is emitted as a flat prompt beside the skills —
+// the orchestrator can hand it to whoever does the work.
+for (const a of manifest.agents ?? []) {
+  const body = await readFile(join(root, a.core), "utf8");
+  const front = [
+    `name: ${a.id}`,
+    `description: ${scalar(a.description)}`,
+    a.model && `model: ${a.model}`,
+    a.color && `color: ${a.color}`,
+    a.tools && `tools: ${a.tools}`,
+  ].filter(Boolean);
+  await mkdir(join(root, "agents"), { recursive: true });
+  await writeFile(join(root, "agents", `${a.id}.md`), `---\n${front.join("\n")}\n---\n\n${banner(a.core)}\n${body}`);
+  await writeFile(join(root, "hosts", "codex", `${a.id}.md`), `${banner(a.core)}\n# ${a.title}\n\n${body}`);
+  console.log(`${a.id}: agents/${a.id}.md · hosts/codex/${a.id}.md`);
 }
 
 // Claude Code manifest — derived from the root manifest, never edited by hand.
