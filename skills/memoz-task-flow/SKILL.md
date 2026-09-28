@@ -154,8 +154,19 @@ Verify the selected task's checklist **against the code**, not against the check
 
 ## 4. One task at a time
 
-The session's scope is the selected task only. If you notice work missing elsewhere, note it —
-do not start it. Respect the parent task's *Not Doing* list as a hard fence.
+The session's scope is the selected task only. Respect the parent task's *Not Doing* list as a
+hard fence.
+
+If you notice work missing elsewhere, **record it as a task** where the declaration says work is
+tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no
+declaration, list it for the user and ask where it belongs. Do not start it — and do not hand it
+to a separate session of its own either.
+
+⚠️ Work started outside the task list is invisible to everyone who checks the task list,
+including the overlap check in *parallel work*. Measured: a finding handed off as a one-click
+"start this in its own session" was fixed there while the same defect was being fixed here. The
+task list showed nothing active, so neither side saw the other, and one of the two fixes was
+thrown away.
 
 ## 5. Verification commands come from the project
 
