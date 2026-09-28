@@ -86,10 +86,10 @@
       "id": "memoz-reviewer",
       "core": "core/agents/reviewer.md",
       "title": "Memoz reviewer",
-      "description": "Reviews one branch's diff independently and adversarially, asking what contract the change breaks that the compiler and tests cannot see. Use after an implementer finishes and before the orchestrator asks a human to approve. Does not change code; never reads the task note before forming its own view.",
+      "description": "Reviews one branch's diff independently and adversarially, asking what contract the change breaks that the compiler and tests cannot see. Use after an implementer finishes and before the orchestrator asks a human to approve. Does not change code; never opens the task note; returns its report as its last message for the orchestrator to record.",
       "model": "opus",
       "color": "red",
-      "tools": "Read, Grep, Glob, Bash, mcp__memoz__append_note"
+      "tools": "Read, Grep, Glob, Bash"
     }
   ]
 }

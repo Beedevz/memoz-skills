@@ -126,16 +126,16 @@ conversation, not a record.
 | agent | does | never does |
 |---|---|---|
 | `memoz-implementer` | one piece, in its own worktree; report into the task note | push · merge · change task status |
-| `memoz-reviewer` | an independent, adversarial read of the diff — contracts the compiler cannot see | change code · read the implementer's report first |
+| `memoz-reviewer` | an independent, adversarial read of the diff — contracts the compiler cannot see; returns its report as its last message | change code · open the task note |
 
 Hosts without sub-agents get the same role text as flat prompts under `hosts/codex/`.
 
-⚠️ The reviewer's tool list names `mcp__memoz__append_note`, which assumes the Memoz MCP server
-serving **this project's vault** is registered as `memoz` (as in the install commands above). If
-it is registered under another name, the reviewer cannot write its report. If you run **several**
-Memoz servers, it is worse: the reviewer writes to whichever vault the server named `memoz`
-serves — possibly not this project's. Keep `memoz` pointed at the project's vault, or edit the
-tools line in your own copy.
+The reviewer has **no knowledge-layer tools**. An agent's tool list names an MCP server by its
+registered name, and with several Memoz vaults connected — each served under its own name — a
+fixed name points at one vault only, possibly not this project's — and then the report can be lost
+to a failed write, or can land in the wrong vault. So the reviewer hands its report back, and the
+orchestrator records it through the server it settled on for the project's declared vault. The
+implementer is given that server by name, and stops rather than write into a different vault.
 
 ## Layout
 
