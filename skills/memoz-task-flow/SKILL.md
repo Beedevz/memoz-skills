@@ -44,7 +44,9 @@ Reachability is a *capability*; ownership is a *declaration*.
 
 ## 2a. Vault backend
 
-Query the tasks with the Memoz MCP tools, scoped by `folder`:
+Query the tasks with the Memoz MCP tools, scoped by `folder` — through the server settled in
+§2c. With more than one Memoz server connected, settle it **before** the first query: a query sent
+to the wrong server answers correctly, about the wrong vault.
 
 - `list_tasks(status: "doing")` → the active task — exactly one per working directory. Several
   are normal when work runs in parallel, each in its own worktree.
@@ -97,17 +99,36 @@ When `backend` is `vault`, two settings answer the same question and they do **n
 other: the `vault` field in the declaration, and the vault the data server was pointed at.
 
 Before concluding that there is no work to do, check that they agree. A Memoz MCP server reports
-the vault it is serving in the instructions it sends at connection time; compare that with the
-declared `vault`.
+the vault it is serving in the instructions it sends at connection time. It reports a **path**;
+the declaration holds a vault **name**. A vault opened from a folder takes that folder's name, so
+compare the name with the path's last segment — but a vault can be renamed, so a difference is a
+reason to stop and show both values, not proof that the vault is wrong.
 
-- **They agree** → proceed.
-- **They disagree** → **stop and tell the user.** Name both values; do not pick one.
-- **The server does not report a vault** → say so once, then continue. Older servers do not
-  report it, and treating silence as a mismatch would block every project running one.
+Several Memoz servers can be connected at once, each under its own name, each serving a different
+vault. A server's name does not tell you which vault it serves, so look at what each one reports
+and settle on one, in this order:
+
+1. **A server reports the declared vault** → use it. (Two that report it serve the same vault;
+   either will do.)
+2. **None does, and exactly one server reports no vault** → use that one, and say so once. Older
+   servers do not report a vault, and treating silence as a mismatch would block every project
+   running one.
+3. **None does, and no server is left to fall back on** — every server reports some other vault
+   → **stop and tell the user.** Name the declared vault and every reported one; do not pick one.
+4. **None does, and several servers report no vault** → **ask the user** which one serves the
+   declared vault. Do not pick.
+
+With a single server this reduces to: it agrees → proceed; it disagrees → stop; it is silent →
+say so and continue.
 
 ⚠️ Not being able to check is not the same as failing the check. Conflating them turns a missing
 capability into a wall — and the wall appears for exactly the users who have not updated yet,
 which is most of them for most of the time.
+
+⚠️ Case 4 is not the same as case 2. With one silent server, silence is the only thing it can
+say — it is the server you have. With several, "continue" would mean choosing one of them, and a
+wrong choice is exactly the silent failure this section exists to prevent: an empty `doing` list
+from a vault that has no tasks, reported as "no work to do".
 
 ⚠️ Never report "no tasks" on an unverified backend. This failure is silent by construction: the
 server answers correctly, the query is well-formed, and the result is genuinely empty — because
