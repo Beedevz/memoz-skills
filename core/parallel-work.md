@@ -43,6 +43,7 @@ The task note carries the coordination state, so it survives a lost session:
   Every agent that touches notes gets this server named in its prompt.
 - [ ] Write a task note per piece: `status: doing`, `branch`, `worktree`, `files`, `stage: implementing`. Scope, contracts and *Not Doing* go in the note.
 - [ ] List the other `doing` tasks. Intersect their `files` with this one's, and with the project's **hot files** (`hotFiles` in `.memoz/tasks.json` — shared files and how each is resolved).
+- [ ] ⚠️ **An empty `doing` list does not mean nobody is on it.** Work started outside this protocol has no task note, so the step above cannot see it. Also look for open merge/pull requests and remote branches touching the same files (`git fetch --prune`, then the forge's list of open requests). Found one → stop and tell the human. In the case that produced this step, the other request had been open for hours; one listing would have shown it.
 - [ ] ⛔ **If they intersect, do not start in parallel — ask the human.** Show, for each shared file: which pieces touch it, whether it is a hot file and how it resolves, the proposed merge order, and what running them one after another would cost. Run in parallel only on approval; otherwise run them in sequence. No intersection → no approval needed (just say so).
   ⚠️ "It is a hot file, it regenerates" does **not** replace approval. That a resolution exists does not mean the collision was accepted — and the first resolution proposed for a hot file in the pilot turned out to be wrong.
 - [ ] Create the worktree from the up-to-date base branch; install dependencies there (a fresh worktree has none).
@@ -51,6 +52,7 @@ The task note carries the coordination state, so it survives a lost session:
 
 ## 2. Starting the agents
 
+- [ ] **Parallel work is started only here, by the orchestrator.** A piece handed to a separate, unsupervised session — a background session, a "start this in its own session" shortcut — has no task note, no overlap check, no reviewer and no merge order. If a piece is not ready to run under this protocol, it becomes a `todo` task (see the task-flow skill), not a side session.
 - [ ] **Implementer prompt:** task-note path · the knowledge-layer server to use · worktree · branch · tool paths · where the measured traps are written down · verification commands · commit conventions · "no push".
 - [ ] **Reviewer prompt:** the scope **in the prompt** (goal · contract risks · *Not Doing* · hot files) · the diff range · "do not open the task note". Its value comes from not carrying the implementer's assumptions; a rule like "skip the report section" failed in the pilot because the tool used to skip it misfired. "Never open it" is enforceable; "read part of it" is not.
 - [ ] **Model:** risky contract work → the stronger model; mechanical work → the cheaper one. Reviewer: the stronger one.
