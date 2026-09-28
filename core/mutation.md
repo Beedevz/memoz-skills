@@ -53,6 +53,6 @@ Report mutation results with the count and the outcome of each — including the
 *not applied*, and what you did about them. A summary that says only "tests pass" hides exactly
 the information this discipline exists to produce.
 
-⚠️ This skill describes the discipline; it cannot enforce it. Enforcement belongs in a hook or a
-CI gate — something that runs whether or not anyone remembered. Guidance that depends on being
-recalled is guidance, not a guarantee.
+⚠️ This skill describes the discipline; it cannot enforce it. Guidance that depends on being
+recalled is guidance, not a guarantee. Whether that gap is worth a hook or a CI gate is the user's
+decision — a gate has its own cost in upkeep and false alarms — so do not add one on your own.

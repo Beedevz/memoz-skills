@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Memoz agent skills — engineering discipline backed by your own Memoz vault.",
-    "version": "0.2.3"
+    "version": "0.2.4"
   },
   "plugins": [
     {
       "name": "memoz",
       "source": "./",
       "description": "Memoz agent skills — engineering discipline backed by your own Memoz vault.",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "author": {
         "name": "Beedevz LLC",
         "url": "https://github.com/Beedevz"

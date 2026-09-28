@@ -36,11 +36,15 @@ that would have triggered action.
 When it is an existing entry: add the occurrence with its date and **what was different this
 time**. "Happened again" is not worth writing; the variation is the information.
 
-## Promote on the second occurrence
+## Promotion is the user's call, not a counter's
 
-A log that only records is a diary. The point of counting is that a count crossing a threshold
-changes something. The threshold here is **two**: when a shape is seen the second time, the entry
-does not close with a note — it moves **at least one step up this ladder**:
+The count is there so the user can see what keeps coming back. It does not trigger anything by
+itself. Automatic promotion — "seen twice, so build a stronger check" — was tried and dropped: the
+checks multiplied, and more time went into handling what they reported than into the work. By
+default a repeated shape is **recorded as an instruction (L1) at most**, and nothing more is built
+unless the user asks.
+
+The ladder, for when the user does ask:
 
 | level | who catches it next time | lives in | weakness |
 |---|---|---|---|
@@ -48,8 +52,12 @@ does not close with a note — it moves **at least one step up this ladder**:
 | **L1 — required step** | whoever does the work, because their instructions say so | an agent role, a skill, a verification checklist | a step can be skipped or done wrong |
 | **L2 — automatic gate** | a machine — test, hook, CI | the repository | costly to build; must be **proven by mutation** |
 
-- **Seen again while already at a level → one more step.** A rule that exists and did not prevent
-  the repeat is evidence the rule is not enough.
+- **Seen again while already at a level** is worth saying to the user, with the count — a rule
+  that exists and did not prevent the repeat may not be enough. Whether to go a step up is theirs
+  to decide; do not propose a gate as the default answer to a pattern.
+- **L2 is the expensive step.** Build one only when the user asks, and only for a mistake that
+  caused real damage (lost work, a broken release, lost data, a leaked secret). Every gate has to
+  be maintained, and its false alarms are paid for by whoever is doing the actual work.
 - **L2 means the gate catches the shape itself**, and that is shown by putting the mistake back on
   purpose and watching the gate turn red. A hook that only checks whether someone *declared* they
   mutated is an automated reminder — L1, not L2. A regression test pinning one incident is a lock
@@ -61,8 +69,8 @@ does not close with a note — it moves **at least one step up this ladder**:
 - **Measure the rule before you write it.** A proposed L1 step that said "run the shadow analyser"
   would have been blind: measured, the analyser stayed silent on exactly the kind of case that
   prompted it. A blind rule is worse than none — it reassures without protecting.
-- Record the promotion in the entry: `Level: Lx — <where>`, with why this level and why not higher.
-  A project may declare its own threshold; two is the default.
+- Record a promotion in the entry: `Level: Lx — <where>`, with why this level and why not higher.
+  A project may declare an automatic threshold of its own; by default there is none.
 
 Who decides: whoever found the mistake writes it down as a *candidate*; the classification (new
 shape or another occurrence) and the promotion are **the user's call**; then the promotion is
