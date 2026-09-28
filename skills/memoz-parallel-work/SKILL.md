@@ -22,7 +22,7 @@ and this side was the one that was not written down.
 | role | does | never does |
 |---|---|---|
 | **implementer** | the work, in its own worktree; verifies by measuring; writes its report into the task note | push · merge · change the task's status · touch files outside its declared set |
-| **reviewer** | reads the diff independently and adversarially: "what contract does this break that the compiler and tests cannot see?" | changes code · reads the implementer's report before forming its own view |
+| **reviewer** | reads the diff independently and adversarially: "what contract does this break that the compiler and tests cannot see?"; returns its report as its last message | changes code · opens the task note (its independence depends on not reading the implementer's report) |
 | **orchestrator** | splits the work, checks overlap, starts agents, **re-verifies every claim**, pushes, asks the human | forwards a report without checking it · writes the fix itself |
 
 The human approves: overlap, merges, anything outward-facing.
@@ -42,6 +42,12 @@ The task note carries the coordination state, so it survives a lost session:
 
 ## 1. Before anything starts
 
+- [ ] **Settle which knowledge-layer server serves the project's declared vault** (`.memoz/tasks.json` → `vault`). A server reports the vault it serves when it connects (see the task-flow skill). With several vaults connected, each under its own name, a name alone does not tell you — so, in this order:
+  1. the server whose reported vault **matches** → use it;
+  2. none matches, and **exactly one** server reports no vault → use it, and say so;
+  3. otherwise (no candidate, or several that do not report) → **ask the human**. Picking one of several unreporting servers is the wrong-vault risk this step exists to remove.
+
+  Every agent that touches notes gets this server named in its prompt.
 - [ ] Write a task note per piece: `status: doing`, `branch`, `worktree`, `files`, `stage: implementing`. Scope, contracts and *Not Doing* go in the note.
 - [ ] List the other `doing` tasks. Intersect their `files` with this one's, and with the project's **hot files** (`hotFiles` in `.memoz/tasks.json` — shared files and how each is resolved).
 - [ ] ⛔ **If they intersect, do not start in parallel — ask the human.** Show, for each shared file: which pieces touch it, whether it is a hot file and how it resolves, the proposed merge order, and what running them one after another would cost. Run in parallel only on approval; otherwise run them in sequence. No intersection → no approval needed (just say so).
@@ -52,19 +58,21 @@ The task note carries the coordination state, so it survives a lost session:
 
 ## 2. Starting the agents
 
-- [ ] **Implementer prompt:** task-note path · worktree · branch · tool paths · where the measured traps are written down · verification commands · commit conventions · "no push".
+- [ ] **Implementer prompt:** task-note path · the knowledge-layer server to use · worktree · branch · tool paths · where the measured traps are written down · verification commands · commit conventions · "no push".
 - [ ] **Reviewer prompt:** the scope **in the prompt** (goal · contract risks · *Not Doing* · hot files) · the diff range · "do not open the task note". Its value comes from not carrying the implementer's assumptions; a rule like "skip the report section" failed in the pilot because the tool used to skip it misfired. "Never open it" is enforceable; "read part of it" is not.
 - [ ] **Model:** risky contract work → the stronger model; mechanical work → the cheaper one. Reviewer: the stronger one.
 - [ ] Parallel pieces start together; background them.
 
 ## 3. When results come back — verify, do not forward
 
+- [ ] **Where is the implementer's report?** If it could not reach the note, its last message carries the full report — record it through the server you settled on. If it stopped because that server reports a *different* vault than the declared one, your settling was wrong: settle again (§1) before recording anything.
 - [ ] **Is the tree actually clean?** ⚠️ An empty result is not a clean result: `git status | wc -l` printing `0` also happens when the command errored. Take the exit code, or look for something that is always there (a known positive) in the same query. In the pilot this caught an implementer that reported "done" with its last edit never committed.
 - [ ] **Does the diff stay inside `files`?** Anything outside is either a scope change the human should hear about, or a mistake.
 - [ ] **Re-measure the key claims yourself** — counts, "zero left", "tests unchanged". Compare test *counts* before and after, not just pass/fail: a renamed test file that stops being discovered still leaves the suite green.
 - [ ] `stage: agent-review` → start the reviewer.
 - [ ] **Reproduce every finding yourself** (command + output). For every suspicion or "not a finding" note, ask whether a cheap measurement exists — in the pilot a note the reviewer filed as "not a finding" turned out, under a mutation, to be a missing lock.
 - [ ] ⚠️ **Check the reviewer's reasoning too, not only its conclusion.** A finding can be right for the wrong reason ("this was already like that on the base branch" — it was not).
+- [ ] **Record the reviewer's report in the task note yourself**, verbatim, through the server you settled on, and mark each finding *reproduced* or *not reproduced*. The reviewer role carries no knowledge-layer tools on purpose: a server name fixed in a tool list follows one vault, not the project.
 - [ ] **Send the fix back to the implementer** — its context is still there. Do not write the fix yourself: then nobody verifies it.
 - [ ] Verify the follow-up commit as well (only the requested files? does the mutation die now?) → `stage: verified`.
 
