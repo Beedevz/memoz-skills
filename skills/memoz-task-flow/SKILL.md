@@ -22,6 +22,12 @@ cat .memoz/tasks.json 2>/dev/null
 | `vault` | which vault (`backend: vault`) | **ask** |
 | `folder` | scope inside the vault | vault root |
 | `taskDir` | task directory (`backend: repo`) | `docs/tasks` |
+| `hotFiles` | files that parallel pieces of work tend to share, each with how a collision resolves: `regenerate` (+ `command`) or `serialize` | none — no file is treated as shared |
+
+A `hotFiles` entry, for example: `{ "path": "docs/index.md", "resolve": "regenerate", "command": "npm run gen:index" }`.
+`regenerate` means never merge it by hand — take either side and run the command. `serialize`
+means pieces that touch it do not run in parallel without the user's approval. See
+*parallel work*.
 
 - **File present** → follow the branch `backend` names. No guessing.
 - **File missing → STOP and ASK.** Ask what the prefix is and where work is tracked. Create
@@ -40,11 +46,16 @@ Reachability is a *capability*; ownership is a *declaration*.
 
 Query the tasks with the Memoz MCP tools, scoped by `folder`:
 
-- `list_tasks(status: "doing")` → the active task. There should be exactly one.
+- `list_tasks(status: "doing")` → the active task — exactly one per working directory. Several
+  are normal when work runs in parallel, each in its own worktree.
 - `list_tasks(status: "todo")` → what is queued.
 
 - **One `doing`** → that is the focus. Read the note; scope and *Not Doing* live there.
-- **More than one `doing`** → ask. Do not choose.
+- **More than one `doing`** → if the notes carry a `worktree` field, the focus is the one whose
+  `worktree` is the current checkout (`git rev-parse --show-toplevel`). Compare **resolved** paths,
+  not strings — a path through a symlink (`/tmp` → `/private/tmp` on macOS) names the same
+  directory but does not compare equal. Otherwise — or if none or several match — **ask**. Do not
+  choose.
 - **No `doing`** → show the `todo` list by priority and **ask**. Do not start on your own.
 - Mark the chosen task `doing` before working.
 
@@ -53,6 +64,11 @@ meaningless here.
 
 ⚠️ Sub-tasks may be separate notes (`<prefix>-NN/T<k> — …`) or sections inside the parent note.
 Both are valid — read which one this project uses; do not impose a shape.
+
+When work runs in parallel, a task note also carries `branch`, `worktree`, `files` (the paths it
+claims) and `stage` (`implementing` → `agent-review` → `verified`). The rule is **one `doing` per
+worktree** — two active tasks in one working directory cannot be told apart. Only the orchestrator
+writes these fields. See *parallel work*.
 
 ## 2b. Repo backend
 

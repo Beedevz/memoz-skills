@@ -89,6 +89,7 @@ Every project that uses these skills carries one small file:
 | `vault` | which vault (`backend: vault`) | **ask** |
 | `folder` | scope inside the vault | vault root |
 | `taskDir` | task directory (`backend: repo`) | `docs/tasks` |
+| `hotFiles` | files parallel work tends to share, and how a collision resolves (`regenerate` + `command`, or `serialize`) | nothing treated as shared |
 
 **If the file is missing, the skills stop and ask.** They never guess.
 
@@ -113,9 +114,28 @@ quietly adopt **another project's** tasks. Reachability is a *capability*; owner
 | `memoz-debugging` | Eliminate, don't guess — and keep the hypotheses that were **falsified** |
 | `memoz-verification` | Evidence before the claim — and the claim and the check must match |
 | `memoz-planning` | Pieces you can finish, criteria you can **run**, and a stated boundary |
+| `memoz-parallel-work` | One worktree per piece; **ask before overlapping work runs in parallel**; re-verify every agent's claim |
 
 Each one ends by writing into your knowledge layer: a process that leaves no trace is a
 conversation, not a record.
+
+### Agents (Claude Code)
+
+`memoz-parallel-work` hands pieces to two roles, shipped as plugin agents:
+
+| agent | does | never does |
+|---|---|---|
+| `memoz-implementer` | one piece, in its own worktree; report into the task note | push · merge · change task status |
+| `memoz-reviewer` | an independent, adversarial read of the diff — contracts the compiler cannot see | change code · read the implementer's report first |
+
+Hosts without sub-agents get the same role text as flat prompts under `hosts/codex/`.
+
+⚠️ The reviewer's tool list names `mcp__memoz__append_note`, which assumes the Memoz MCP server
+serving **this project's vault** is registered as `memoz` (as in the install commands above). If
+it is registered under another name, the reviewer cannot write its report. If you run **several**
+Memoz servers, it is worse: the reviewer writes to whichever vault the server named `memoz`
+serves — possibly not this project's. Keep `memoz` pointed at the project's vault, or edit the
+tools line in your own copy.
 
 ## Layout
 
@@ -124,10 +144,11 @@ core/            host-agnostic discipline text — the single source
 plugin.json      plugin identity — the single source for every manifest
 skills/          SKILL.md form (Claude Code + Gemini CLI + Antigravity share this shape)
 hosts/           per-host renders that are not SKILL.md (e.g. Codex prompts)
+agents/          Claude Code agent roles, rendered from core/agents/
 .claude-plugin/  Claude Code plugin + marketplace manifests
 ```
 
-`skills/`, `hosts/` and `.claude-plugin/` are **generated** — do not hand-edit them. Agent instructions
+`skills/`, `hosts/`, `agents/` and `.claude-plugin/` are **generated** — do not hand-edit them. Agent instructions
 maintained separately per host drift apart quickly, and the drift is silent: the same command
 behaves differently depending on which tool you happen to be using. One source, rendered per host.
 
