@@ -7,7 +7,7 @@ export type TaskStats = {
   vaultPath: string
   main: { total: number; byStatus: StatusCounts }
   sub: { total: number; byStatus: StatusCounts }
-  /** Notes in the folder root whose name does not start with the prefix. */
+  /** Notes with a `status` that are not tasks: neither named after a task id nor inside a task's folder. */
   unprefixed: number
   /** Open (todo) tasks, main and sub, by priority; "none" when the note has none. */
   todoByPriority: StatusCounts

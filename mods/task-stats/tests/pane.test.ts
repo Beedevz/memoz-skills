@@ -92,7 +92,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
       }
       expect(text).toContain('ABC-1 — alpha')
       expect(text).toContain('T1 — sub')
-      expect(text).toContain('1 root notes without the ABC- prefix')
+      expect(text).toContain('1 other status note (not tasks, not counted)')
       await ui.unmount()
     })
 
@@ -180,4 +180,43 @@ describe('vault discovery and refresh', () => {
     expect(await ui.find({ key: 'active:ABC-1 — T1 — sub' })).toBeDefined()
     await ui.unmount()
   })
+})
+
+describe('a declaration whose folder is the project folder, with tasks further down', () => {
+  const PROJECT = '/home/u/vaults/V/Proj'
+  const nested = (): Fixture =>
+    new Map([
+      [`${CWD}/.memoz/tasks.json`, '{"prefix":"ABC","backend":"vault","vault":"V","folder":"Proj"}'],
+      [`${PROJECT}/Tasks/ABC-1 — alpha.md`, note('status: doing')],
+      [`${PROJECT}/Tasks/ABC-2 — beta.md`, note('status: todo\npriority: 1')],
+      [`${PROJECT}/Tasks/ABC-1/T1 — sub.md`, note('status: review')],
+      [`${PROJECT}/Tasks/ABC-1/notes/T2 — deeper.md`, note('status: done\ndone: 2026-10-08')],
+      [`${PROJECT}/Decisions/Use X.md`, note('status: accepted')],
+      // a decision id shares the prefix but is not a task id (prefix, dash, digit)
+      [`${PROJECT}/Decisions/ABC-D1 — use Y.md`, note('status: accepted')],
+      [`${PROJECT}/Plan.md`, note('status: todo')],
+    ])
+
+  test('counts tasks at any depth: prefixed notes are main, notes under a prefixed folder are sub', OPTIONS, async ($, on) => {
+    const { clock, statuses } = world(on, nested())
+    await start($, clock)
+    expect(statuses.at(-1)).toContain('ABC 2+2 tasks · doing 1 · review 1 · todo 1')
+  })
+
+  test('status notes outside the prefix, anywhere in the folder, are named and not counted', OPTIONS, async ($, on) => {
+    const { clock } = world(on, nested())
+    await start($, clock)
+    const ui = await $.ui.mount({ plugin: 'memoz-task-stats', surface: 'terminal', ...PANE })
+    expect(await shown(ui)).toContain('3 other status notes (not tasks, not counted)')
+    expect(await shown(ui)).toContain('ABC-1 / T1 — sub')
+    await ui.unmount()
+  })
+})
+
+test('reads in batches without dropping a note: 70 tasks are all counted', OPTIONS, async ($, on) => {
+  const files: Fixture = new Map([[`${CWD}/.memoz/tasks.json`, '{"prefix":"ABC","backend":"vault","vault":"V"}']])
+  for (let i = 1; i <= 70; i++) files.set(`${TASKS}/ABC-${i} — t.md`, note('status: todo'))
+  const { clock, statuses } = world(on, files)
+  await start($, clock)
+  expect(statuses.at(-1)).toContain('ABC 70+0 tasks')
 })

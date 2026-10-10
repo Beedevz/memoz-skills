@@ -10,6 +10,7 @@ import {
   donePercent,
   KNOWN_STATUSES,
   localDay,
+  otherNotesLine,
   priorityLabel,
   priorityOrder,
   statusLine,
@@ -44,36 +45,38 @@ async function findDeclaration($: EngineInterface, cwd: string): Promise<Declara
   }
 }
 
-type NoteFile = { path: string; name: string; parent?: string; mtimeMs: number; size: number }
+type NoteFile = { path: string; name: string; dirs: string[]; mtimeMs: number; size: number }
 
-/** Root `.md` notes and the `.md` notes one sub-folder down (sub-tasks); dot-names are skipped. */
-async function listNotes($: EngineInterface, folder: string): Promise<NoteFile[]> {
-  const isNote = (e: { name: string; kind: string }) => e.kind === 'file' && e.name.endsWith('.md')
+/** Every `.md` note under `folder`, at any depth, folders listed in parallel; dot-names are skipped. */
+async function listNotes($: EngineInterface, folder: string, dirs: string[] = []): Promise<NoteFile[]> {
   const entries = (await $.fs.list(folder)).filter(e => !e.name.startsWith('.'))
   const nested = await Promise.all(
-    entries
-      .filter(e => e.kind === 'dir')
-      .map(async dir =>
-        (await $.fs.list(`${folder}/${dir.name}`))
-          .filter(e => !e.name.startsWith('.') && isNote(e))
-          .map(e => ({ path: `${folder}/${dir.name}/${e.name}`, name: e.name, parent: dir.name, mtimeMs: e.mtimeMs, size: e.size })),
-      ),
+    entries.filter(e => e.kind === 'dir').map(dir => listNotes($, `${folder}/${dir.name}`, [...dirs, dir.name])),
   )
-  const top = entries.filter(isNote).map(e => ({ path: `${folder}/${e.name}`, name: e.name, mtimeMs: e.mtimeMs, size: e.size }))
-  return [...top, ...nested.flat()]
+  const here = entries
+    .filter(e => e.kind === 'file' && e.name.endsWith('.md'))
+    .map(e => ({ path: `${folder}/${e.name}`, name: e.name, dirs, mtimeMs: e.mtimeMs, size: e.size }))
+  return [...here, ...nested.flat()]
+}
+
+// At most this many note reads at once, so the first scan of a large folder does not open every file together.
+const READ_BATCH = 32
+
+async function readNote($: EngineInterface, file: NoteFile, next: Map<string, Cached>): Promise<TaskNote> {
+  const hit = cache.get(file.path)
+  const isFresh = hit !== undefined && hit.mtimeMs === file.mtimeMs && hit.size === file.size
+  const text = isFresh ? hit.text : await $.fs.read(file.path)
+  next.set(file.path, { mtimeMs: file.mtimeMs, size: file.size, text })
+  return { name: file.name, dirs: file.dirs, text }
 }
 
 async function readNotes($: EngineInterface, folder: string): Promise<TaskNote[]> {
   const next = new Map<string, Cached>()
-  const notes = await Promise.all(
-    (await listNotes($, folder)).map(async file => {
-      const hit = cache.get(file.path)
-      const isFresh = hit !== undefined && hit.mtimeMs === file.mtimeMs && hit.size === file.size
-      const text = isFresh ? hit.text : await $.fs.read(file.path)
-      next.set(file.path, { mtimeMs: file.mtimeMs, size: file.size, text })
-      return { name: file.name, parent: file.parent, text }
-    }),
-  )
+  const files = await listNotes($, folder)
+  const notes: TaskNote[] = []
+  for (let i = 0; i < files.length; i += READ_BATCH) {
+    notes.push(...(await Promise.all(files.slice(i, i + READ_BATCH).map(file => readNote($, file, next)))))
+  }
   cache = next
   return notes
 }
@@ -192,7 +195,7 @@ export const register: Register = (on, options) => {
           <Text dimColor>{`updated ${updated} · refreshes every minute · /task-stats to refresh now`}</Text>
           <Svg source={svg.source} alt={dashboardAlt(s)} height={svg.height} isInteractive />
           <Markdown text={activeMarkdown(s)} />
-          {s.unprefixed > 0 && <Text dimColor>{`${s.unprefixed} root notes without the ${s.prefix}- prefix (not counted)`}</Text>}
+          {otherNotesLine(s) !== undefined && <Text dimColor>{otherNotesLine(s)}</Text>}
         </Box>
       )
     }
@@ -222,7 +225,7 @@ export const register: Register = (on, options) => {
           {`Todo by priority: ${priorities.map(p => `${priorityLabel(p)} ${s.todoByPriority[p]}`).join(' · ') || 'none'}`}
         </Text>
         {countOther(s) > 0 && <Text dimColor>{`other: statuses outside ${KNOWN_STATUSES.join(', ')}`}</Text>}
-        {s.unprefixed > 0 && <Text dimColor>{`${s.unprefixed} root notes without the ${s.prefix}- prefix (not counted)`}</Text>}
+        {otherNotesLine(s) !== undefined && <Text dimColor>{otherNotesLine(s)}</Text>}
         <Text> </Text>
         <Text bold>Active</Text>
         {s.active.length === 0 && <Text dimColor>nothing in doing or review</Text>}

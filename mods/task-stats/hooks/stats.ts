@@ -1,7 +1,7 @@
 import type { StatusCounts, TaskStats } from '../types'
 
-/** One task note as read from the vault; `parent` is its sub-folder, absent in the folder root. */
-export type TaskNote = { name: string; parent?: string; text: string }
+/** One note as read from the vault; `dirs` are the folders between the declared folder and the note. */
+export type TaskNote = { name: string; dirs: string[]; text: string }
 
 export type Frontmatter = { status?: string; priority?: string; done?: string }
 
@@ -51,8 +51,11 @@ const bump = (counts: StatusCounts, key: string) => {
 }
 
 /**
- * Main tasks are folder-root notes named `<prefix>-…`; sub-tasks are notes in a sub-folder named
- * `<prefix>-…`. Notes without `status` are not tasks. Root notes outside the prefix are only counted.
+ * Notes without `status` are skipped. A note named after a task id (`<prefix>-<number>…`) is a main
+ * task, at any depth. Any other note whose nearest task-id folder above it names a task is a
+ * sub-task of that task. Every remaining status note (a decision such as `<prefix>-D1`, a plan) is
+ * not a task: it only adds to `unprefixed`, so a project folder that also holds decisions or plans
+ * counts just its tasks.
  */
 export function computeStats(notes: TaskNote[], prefix: string, vaultPath: string, now: number, today: string): TaskStats {
   const stats: TaskStats = {
@@ -69,21 +72,23 @@ export function computeStats(notes: TaskNote[], prefix: string, vaultPath: strin
     computedAt: now,
     today,
   }
-  const lead = `${prefix}-`
+  // A task id is the prefix, a dash and a number (`ABC-12`); `ABC-D1` (a decision id) is not one.
+  const id = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d`)
+  const isTask = (name: string) => id.test(name)
   for (const note of notes) {
     const fm = parseFrontmatter(note.text)
     if (fm.status === undefined) continue
-    const owner = note.parent ?? note.name
-    if (!owner.startsWith(lead)) {
-      if (note.parent === undefined) stats.unprefixed++
+    const parent = isTask(note.name) ? undefined : note.dirs.findLast(isTask)
+    if (parent === undefined && !isTask(note.name)) {
+      stats.unprefixed++
       continue
     }
-    const group = note.parent === undefined ? stats.main : stats.sub
+    const group = parent === undefined ? stats.main : stats.sub
     group.total++
     bump(group.byStatus, fm.status)
     if (fm.status === 'todo') bump(stats.todoByPriority, fm.priority ?? 'none')
     if (fm.status === 'doing' || fm.status === 'review') {
-      stats.active.push({ name: note.name.replace(/\.md$/, ''), status: fm.status, parent: note.parent })
+      stats.active.push({ name: note.name.replace(/\.md$/, ''), status: fm.status, parent })
     }
     // A done value that is not a real past day (a link, `true`, a future typo) counts nowhere.
     const age = fm.status === 'done' && fm.done !== undefined ? daysBetween(fm.done, today) : undefined
@@ -119,6 +124,12 @@ export function priorityOrder(keys: string[]): string[] {
 /** `P2` for a numeric priority; a label (`P1`, `high`) and `none` as they are. */
 export function priorityLabel(key: string): string {
   return /^\d+$/.test(key) ? `P${key}` : key
+}
+
+/** The pane's line for status notes that are not tasks, or undefined when there are none. */
+export function otherNotesLine(stats: TaskStats): string | undefined {
+  const n = stats.unprefixed
+  return n === 0 ? undefined : `${n} other status ${n === 1 ? 'note' : 'notes'} (not tasks, not counted)`
 }
 
 /** Done share of the tasks that were not dropped, as a whole percent. */

@@ -165,8 +165,11 @@ vault by absolute path needs no setting.
 
 A third plugin, `memoz-task-stats`, counts the project's tasks under the declared `prefix`. A
 status line shows the totals, for example
-`ABC 230+82 tasks · doing 4 · review 1 · todo 49 · 83% done · 7d +17`: main tasks + sub-tasks
-one folder down, the done share of the tasks not dropped, and tasks closed in the last 7 days.
+`ABC 230+82 tasks · doing 4 · review 1 · todo 49 · 83% done · 7d +17`: main tasks + sub-tasks,
+the done share of the tasks not dropped, and tasks closed in the last 7 days. A main task is a
+note named after a task id (`ABC-12 …`) anywhere under the declared folder; a sub-task is a note
+inside a task's folder (`ABC-12/T3 …`). Other notes with a `status` (decisions such as
+`ABC-D1`, plans) are not counted as tasks; the pane shows how many there are.
 `/task-stats` opens a pane with the status breakdown, tasks closed per week over the last 12
 weeks (from each note's `done:` date), open tasks by priority, and what is in `doing` or
 `review`. The desktop app draws the pane as a chart, the terminal as a table. It re-reads the
