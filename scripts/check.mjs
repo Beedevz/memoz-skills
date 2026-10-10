@@ -9,7 +9,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { cpSync } from "node:fs";
 
@@ -39,6 +39,10 @@ async function tree(dir) {
 const scratch = mkdtempSync(join(tmpdir(), "memoz-skills-check-"));
 for (const item of ["core", "skills.json", "scripts", "plugin.json"]) {
   cpSync(join(root, item), join(scratch, item), { recursive: true });
+}
+// The marketplace lists each mod from its own manifest, so the render needs those too.
+if (existsSync(join(root, "mods"))) {
+  cpSync(join(root, "mods"), join(scratch, "mods"), { recursive: true });
 }
 execFileSync(process.execPath, [join(scratch, "scripts", "render.mjs")], { stdio: "ignore" });
 

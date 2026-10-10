@@ -11,7 +11,7 @@
 // Claude Code wants the same identity at .claude-plugin/plugin.json, so that file is GENERATED
 // from the root one rather than maintained beside it — two hand-written manifests carrying the
 // same name and version are a drift waiting to happen.
-import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
+import { readFile, readdir, writeFile, mkdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -77,6 +77,26 @@ await writeFile(
 );
 console.log("identity: .claude-plugin/plugin.json (from plugin.json)");
 
+// Mods — Claude Code interface plugins, one per mods/<dir>, each with its own hand-written
+// manifest (they are code, not rendered text). The marketplace lists them beside the skills
+// plugin so each installs on its own; their entries are read from those manifests.
+const modDirs = (await readdir(join(root, "mods"), { withFileTypes: true }).catch(() => []))
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+const mods = [];
+for (const dir of modDirs) {
+  const mod = JSON.parse(await readFile(join(root, "mods", dir, ".claude-plugin", "plugin.json"), "utf8"));
+  mods.push({
+    name: mod.name,
+    source: `./mods/${dir}`,
+    description: mod.description,
+    version: mod.version,
+    author: mod.author,
+    keywords: mod.keywords,
+  });
+}
+
 // Marketplace manifest — the same identity again, so it is generated too. Three hand-written
 // manifests naming the same version is how a release ships as two different versions.
 await writeFile(
@@ -95,10 +115,11 @@ await writeFile(
           author: identity.author,
           keywords: identity.keywords,
         },
+        ...mods,
       ],
     },
     null,
     2,
   )}\n`,
 );
-console.log("marketplace: .claude-plugin/marketplace.json (from plugin.json)");
+console.log(`marketplace: .claude-plugin/marketplace.json (from plugin.json${mods.length ? ` + ${mods.length} mod(s)` : ""})`);

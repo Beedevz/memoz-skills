@@ -1,0 +1,250 @@
+import { atom, read, update } from 'claude-code'
+import type { EngineInterface, Register, Timer } from 'claude-code'
+
+import type { BandSnapshot, BandTask } from '../types'
+import {
+  barRuns,
+  byPriority,
+  countText,
+  parseNote,
+  rowLayout,
+  truncate,
+  type ParsedNote,
+  type RunKind,
+} from './band-model'
+import { rowAlt, rowSvg } from './band-svg'
+
+const snapshot = atom(
+  { plugin: 'memoz-task-band', key: 'snapshot' } as const,
+  { kind: 'none' } as BandSnapshot,
+)
+const hidden = atom({ plugin: 'memoz-task-band', key: 'hidden' } as const, [] as string[])
+
+const REFRESH_MS = 30_000
+// Desktop: CSS pixels per band column, measured (95 columns drew a ~768px
+// band). The row's Svg leaves room for the gap and the ✕ beside it; one wider
+// than its slot is scaled down, so erring wide only shrinks the row a little.
+const DESKTOP_PX_PER_COLUMN = 8
+const DESKTOP_HIDE_PX = 36
+const STATUS_COLOR = { doing: 'warning', review: 'suggestion' } as const
+const RUN_STYLE: Record<RunKind, { color?: string; dimColor?: boolean; bold?: boolean }> = {
+  fill: { color: 'success' },
+  'tick-fill': { color: 'success' },
+  empty: { dimColor: true },
+  'tick-empty': { color: 'subtle' },
+  pill: { bold: true },
+}
+
+type Declaration = { vault: string; folder: string }
+type NoteFile = { path: string; id: string; mtimeMs: number; size: number }
+
+let vaultsDir = ''
+// Parsed notes by absolute path; a file is read again only when its
+// mtime or size changed. Lost on reload, which costs one full read.
+let cache = new Map<string, { mtimeMs: number; size: number; note: ParsedNote }>()
+let running: Promise<void> | undefined
+
+// Walks up from the session's directory to the nearest .memoz/tasks.json.
+async function findDeclaration($: EngineInterface): Promise<Declaration | null> {
+  let dir = (await $.session.cwd()).replace(/\/+$/, '')
+  for (;;) {
+    const path = `${dir}/.memoz/tasks.json`
+    if (await $.fs.exists(path)) {
+      const parsed: unknown = JSON.parse(await $.fs.read(path))
+      if (typeof parsed !== 'object' || parsed === null) return null
+      const { backend, vault, folder } = parsed as Record<string, unknown>
+      if (backend !== 'vault' || typeof vault !== 'string' || vault === '') return null
+      return { vault, folder: typeof folder === 'string' && folder !== '' ? folder : 'Tasks' }
+    }
+    if (dir === '') return null
+    dir = dir.slice(0, dir.lastIndexOf('/'))
+  }
+}
+
+// A vault declared by name is looked up under vaultsDir, which the person
+// sets; with none set the band says so rather than guess a location.
+async function vaultPath($: EngineInterface, vault: string): Promise<string | null> {
+  if (vault.startsWith('/')) return vault
+  if (vaultsDir === '') return null
+  const home = (await $.env.get('HOME')) ?? ''
+  const base = vaultsDir.replace(/^~(?=\/|$)/, home).replace(/\/+$/, '')
+  return `${base}/${vault}`
+}
+
+async function listNotes($: EngineInterface, dir: string, prefix: string): Promise<NoteFile[]> {
+  const found: NoteFile[] = []
+  for (const entry of await $.fs.list(dir)) {
+    if (entry.name.startsWith('.')) continue
+    const path = `${dir}/${entry.name}`
+    if (entry.kind === 'dir') {
+      found.push(...(await listNotes($, path, `${prefix}${entry.name}/`)))
+    } else if (entry.kind === 'file' && entry.name.endsWith('.md')) {
+      const id = `${prefix}${entry.name.slice(0, -'.md'.length)}`
+      found.push({ path, id, mtimeMs: entry.mtimeMs, size: entry.size })
+    }
+  }
+  return found
+}
+
+async function scan($: EngineInterface): Promise<BandSnapshot> {
+  const declaration = await findDeclaration($)
+  if (declaration === null) return { kind: 'none' }
+
+  const vault = await vaultPath($, declaration.vault)
+  if (vault === null) return { kind: 'unresolved', vault: declaration.vault }
+  const root = `${vault}/${declaration.folder}`
+  if (!(await $.fs.exists(root))) return { kind: 'missing', path: root }
+
+  const next = new Map<string, { mtimeMs: number; size: number; note: ParsedNote }>()
+  const tasks: BandTask[] = []
+  for (const file of await listNotes($, root, '')) {
+    const cached = cache.get(file.path)
+    const isFresh = cached && cached.mtimeMs === file.mtimeMs && cached.size === file.size
+    const note = isFresh ? cached.note : parseNote(await $.fs.read(file.path))
+    next.set(file.path, { mtimeMs: file.mtimeMs, size: file.size, note })
+    if (note.status !== 'doing' && note.status !== 'review') continue
+    tasks.push({
+      id: file.id,
+      status: note.status,
+      stage: note.stage,
+      priority: note.priority,
+      done: note.done,
+      total: note.total,
+    })
+  }
+  cache = next
+  return { kind: 'tasks', tasks: tasks.sort(byPriority) }
+}
+
+// Overlapping triggers (timer, turn end) share one scan.
+function refresh($: EngineInterface): Promise<void> {
+  running ??= (async () => {
+    let found: BandSnapshot
+    try {
+      found = await scan($)
+    } catch (error) {
+      found = { kind: 'error', message: error instanceof Error ? error.message : String(error) }
+    }
+    const current = await read($, snapshot)
+    if (JSON.stringify(current) !== JSON.stringify(found)) await update($, snapshot, () => found)
+  })().finally(() => {
+    running = undefined
+  })
+  return running
+}
+
+
+export const register: Register = (on, options) => {
+  vaultsDir = typeof options.vaultsDir === 'string' ? options.vaultsDir.trim() : ''
+  let timer: Timer | undefined
+
+  on('session.start', async ($, e, next) => {
+    const result = await next(e)
+    timer?.cancel()
+    timer = $.clock.every(REFRESH_MS, () => refresh($))
+    void refresh($)
+    return result
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    void refresh($)
+    return result
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey || e.props.maxRows < 1) return next(e)
+    const found = await read($, snapshot)
+    if (found.kind === 'none') return next(e)
+
+    const { Box, Text, Button } = $.ui.resolve(e)
+
+    if (found.kind !== 'tasks') {
+      const why =
+        found.kind === 'missing'
+          ? `tasks folder not found: ${found.path}`
+          : found.kind === 'unresolved'
+            ? `set vaultsDir in /config to the folder that holds the "${found.vault}" vault`
+            : found.message
+      return (
+        <Box>
+          <Text dimColor>memoz band: {why}</Text>
+        </Box>
+      )
+    }
+
+    const hiddenIds = await read($, hidden)
+    const tasks = found.tasks.filter(task => !hiddenIds.includes(task.id))
+    // Only hidden tasks that are still doing or review count; a closed one
+    // left in the list is nothing to show again.
+    const hiddenCount = found.tasks.length - tasks.length
+    if (tasks.length === 0 && hiddenCount === 0) return next(e)
+
+    // The footer (overflow count, show-hidden) takes a row of its own.
+    const hasFooter = hiddenCount > 0 || tasks.length > e.props.maxRows
+    const shown = tasks.slice(0, Math.max(0, hasFooter ? e.props.maxRows - 1 : e.props.maxRows))
+    const footer = hasFooter ? (
+      <Box key="footer" flexDirection="row" gap={2}>
+        {shown.length < tasks.length ? <Text dimColor>+{tasks.length - shown.length} more</Text> : null}
+        {hiddenCount > 0 ? (
+          <Button
+            key="show-hidden"
+            plain
+            dimColor
+            label={`${hiddenCount} hidden · show`}
+            onPress={() => update($, hidden, () => [])}
+          />
+        ) : null}
+      </Box>
+    ) : null
+
+    if (e.surface === 'desktop') {
+      const { Svg } = $.ui.resolve(e)
+      const width = Math.max(320, e.props.bodyColumns * DESKTOP_PX_PER_COLUMN - DESKTOP_HIDE_PX)
+      return (
+        <Box flexDirection="column">
+          {shown.map(task => (
+            <Box key={task.id} flexDirection="row" alignItems="center" gap={1}>
+              <Svg source={rowSvg(task, width)} alt={rowAlt(task)} />
+              <Button
+                key={`hide:${task.id}`}
+                plain
+                dimColor
+                label="✕"
+                onPress={() => update($, hidden, ids => (ids.includes(task.id) ? ids : [...ids, task.id]))}
+              />
+            </Box>
+          ))}
+          {footer}
+        </Box>
+      )
+    }
+
+    const layout = shown.length > 0 ? rowLayout(shown, e.props.bodyColumns) : null
+
+    return (
+      <Box flexDirection="column">
+        {layout && shown.map(task => (
+          <Box key={task.id} flexDirection="row">
+            <Text color={STATUS_COLOR[task.status]}>● </Text>
+            <Text>{truncate(task.id, layout.titleWidth).padEnd(layout.titleWidth)}  </Text>
+            {barRuns(task, layout.barWidth).map((run, index) => (
+              <Text key={`${task.id}:run:${index}`} {...RUN_STYLE[run.kind]}>
+                {run.text}
+              </Text>
+            ))}
+            <Text dimColor>  {countText(task).padStart(layout.countWidth)}  </Text>
+            <Button
+              key={`hide:${task.id}`}
+              plain
+              dimColor
+              label="✕"
+              onPress={() => update($, hidden, ids => (ids.includes(task.id) ? ids : [...ids, task.id]))}
+            />
+          </Box>
+        ))}
+        {footer}
+      </Box>
+    )
+  })
+}

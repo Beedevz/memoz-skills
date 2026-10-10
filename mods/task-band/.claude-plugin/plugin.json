@@ -1,0 +1,21 @@
+{
+  "name": "memoz-task-band",
+  "version": "0.1.0",
+  "description": "A band above the Claude Code prompt showing the project's doing and review Memoz tasks: stage, completion criteria and progress.",
+  "homepage": "https://github.com/Beedevz/memoz-skills",
+  "license": "MIT",
+  "author": {
+    "name": "Beedevz LLC",
+    "url": "https://github.com/Beedevz"
+  },
+  "keywords": ["memoz", "task-management", "mod", "progress"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "vaultsDir": {
+      "type": "string",
+      "title": "Vaults directory",
+      "description": "Folder that holds your Memoz vaults. A vault named in .memoz/tasks.json without a path is looked up here (~ is your home). Not needed when the declaration names the vault by absolute path.",
+      "default": ""
+    }
+  }
+}
