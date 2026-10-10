@@ -1,6 +1,6 @@
 {
   "name": "memoz-task-stats",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A status line and a /task-stats pane with the project's Memoz task counts: by status, closed per week, open by priority, and what is in doing or review.",
   "homepage": "https://github.com/Beedevz/memoz-skills",
   "license": "MIT",

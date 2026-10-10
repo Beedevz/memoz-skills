@@ -13,7 +13,7 @@ import {
 
 const note = (name: string, fm: string, parent?: string): TaskNote => ({
   name,
-  parent,
+  dirs: parent === undefined ? [] : [parent],
   text: `---\n${fm}\n---\n\n# ${name}\n`,
 })
 
@@ -49,7 +49,8 @@ test('computeStats splits main and sub-tasks by prefix and skips notes without s
   const s = computeStats(NOTES, 'ABC', '/v/Tasks', NOW, TODAY)
   expect(s.main).toEqual({ total: 7, byStatus: { done: 3, doing: 1, todo: 2, dropped: 1 } })
   expect(s.sub).toEqual({ total: 2, byStatus: { review: 1, todo: 1 } })
-  expect(s.unprefixed).toBe(1)
+  // loose idea.md in the root, and T1 under XY-1, a folder outside the prefix
+  expect(s.unprefixed).toBe(2)
   expect(s.todoByPriority).toEqual({ '1': 1, none: 1, '3': 1 })
   expect(s.active).toEqual([
     { name: 'ABC-4 — d', status: 'doing', parent: undefined },
