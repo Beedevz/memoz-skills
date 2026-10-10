@@ -25,6 +25,22 @@
         "engineering-discipline",
         "task-management"
       ]
+    },
+    {
+      "name": "memoz-task-band",
+      "source": "./mods/task-band",
+      "description": "A band above the Claude Code prompt showing the project's doing and review Memoz tasks: stage, completion criteria and progress.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Beedevz LLC",
+        "url": "https://github.com/Beedevz"
+      },
+      "keywords": [
+        "memoz",
+        "task-management",
+        "mod",
+        "progress"
+      ]
     }
   ]
 }

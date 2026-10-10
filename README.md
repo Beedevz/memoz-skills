@@ -137,6 +137,34 @@ to a failed write, or can land in the wrong vault. So the reviewer hands its rep
 orchestrator records it through the server it settled on for the project's declared vault. The
 implementer is given that server by name, and stops rather than write into a different vault.
 
+### Task band (Claude Code mod)
+
+An optional second plugin, `memoz-task-band`, draws a band above the Claude Code prompt with the
+project's tasks that are `doing` or in `review`: one row per task, its stage as a pill
+(`implementing 1/4` → `agent-review 2/4` → `verified 3/4` → `review 4/4`), and a progress bar
+over its completion criteria (`- [x]` of all `- [ ]`/`- [x]`/`- [~]` boxes; the stage when the
+note has none). The desktop app draws the bar as a graphic, the terminal as text. ✕ hides a row
+for the session; `n hidden · show` brings them back. It reads the same `.memoz/tasks.json`
+declaration as the skills and never writes to the vault.
+
+```bash
+claude plugin install memoz-task-band@memoz-skills
+```
+
+A vault the declaration names without a path (`"vault": "My Notes"`) is looked up under
+`vaultsDir`, the folder that holds your vaults. Set it once, in `/config` or with:
+
+```bash
+echo '{"vaultsDir":"~/path/to/vaults"}' | claude plugin configure memoz-task-band@memoz-skills --values-stdin
+```
+
+Until it is set the band says so instead of guessing a location. A declaration that names the
+vault by absolute path needs no setting.
+
+> Mods use Claude Code's function-hooks API, which is **early access** and may change between
+> releases. This one is tested on Claude Code 2.1.295; if a later release breaks it, the
+> transcript names the plugin and the reason, and the rest of Claude Code is unaffected.
+
 ## Layout
 
 ```
@@ -146,6 +174,7 @@ skills/          SKILL.md form (Claude Code + Gemini CLI + Antigravity share thi
 hosts/           per-host renders that are not SKILL.md (e.g. Codex prompts)
 agents/          Claude Code agent roles, rendered from core/agents/
 .claude-plugin/  Claude Code plugin + marketplace manifests
+mods/            Claude Code mods (hooks modules), one plugin per folder — hand-written code
 ```
 
 `skills/`, `hosts/`, `agents/` and `.claude-plugin/` are **generated** — do not hand-edit them. Agent instructions
