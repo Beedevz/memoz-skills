@@ -161,8 +161,30 @@ echo '{"vaultsDir":"~/path/to/vaults"}' | claude plugin configure memoz-task-ban
 Until it is set the band says so instead of guessing a location. A declaration that names the
 vault by absolute path needs no setting.
 
+### Task stats (Claude Code mod)
+
+A third plugin, `memoz-task-stats`, counts the project's tasks under the declared `prefix`. A
+status line shows the totals, for example
+`ABC 230+82 tasks · doing 4 · review 1 · todo 49 · 83% done · 7d +17`: main tasks + sub-tasks
+one folder down, the done share of the tasks not dropped, and tasks closed in the last 7 days.
+`/task-stats` opens a pane with the status breakdown, tasks closed per week over the last 12
+weeks (from each note's `done:` date), open tasks by priority, and what is in `doing` or
+`review`. The desktop app draws the pane as a chart, the terminal as a table. It re-reads the
+vault every minute and after each turn, rereading only the notes whose files changed, and never
+writes to it.
+
+```bash
+claude plugin install memoz-task-stats@memoz-skills
+```
+
+It finds the vault the same way as the band, through its own `vaultsDir`:
+
+```bash
+echo '{"vaultsDir":"~/path/to/vaults"}' | claude plugin configure memoz-task-stats@memoz-skills --values-stdin
+```
+
 > Mods use Claude Code's function-hooks API, which is **early access** and may change between
-> releases. This one is tested on Claude Code 2.1.295; if a later release breaks it, the
+> releases. These are tested on Claude Code 2.1.295; if a later release breaks one, the
 > transcript names the plugin and the reason, and the rest of Claude Code is unaffected.
 
 ## Layout

@@ -41,6 +41,22 @@
         "mod",
         "progress"
       ]
+    },
+    {
+      "name": "memoz-task-stats",
+      "source": "./mods/task-stats",
+      "description": "A status line and a /task-stats pane with the project's Memoz task counts: by status, closed per week, open by priority, and what is in doing or review.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Beedevz LLC",
+        "url": "https://github.com/Beedevz"
+      },
+      "keywords": [
+        "memoz",
+        "task-management",
+        "mod",
+        "statistics"
+      ]
     }
   ]
 }
