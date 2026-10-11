@@ -17,7 +17,7 @@ cat .memoz/tasks.json 2>/dev/null
 
 | field | meaning | if missing |
 |---|---|---|
-| `prefix` | task-id prefix — `SP` · `BZW` · `ABC`. Ids are `<prefix>-<N>` | **ask** |
+| `prefix` | task-id prefix — `ABC` · `XYZ`. Ids are `<prefix>-<N>` | **ask** |
 | `backend` | `vault` \| `repo` — where work is tracked | **ask** |
 | `vault` | which vault (`backend: vault`) | **ask** |
 | `folder` | scope inside the vault | vault root |
@@ -34,13 +34,12 @@ means pieces that touch it do not run in parallel without the user's approval. S
   `.memoz/tasks.json` only with the user's approval, then continue. **Do not produce task files
   first.**
 
-⚠️ **Why a declaration and not detection.** An earlier version inferred the backend from the
-filesystem and was wrong twice. The second version picked the vault in *every* directory, because
-an MCP server is reachable process-wide — so in an unrelated project it would silently adopt
-**another project's** tasks, and the "neither is present, so ask" branch could never fire.
+⚠️ **Why a declaration and not detection.** An MCP server is reachable from every directory, so
+detecting the backend from what is reachable would, in an unrelated project, silently adopt
+**another project's** tasks — and the "neither is present, so ask" branch could never fire.
 Reachability is a *capability*; ownership is a *declaration*.
 
-⚠️ **Never hardcode a prefix.** `SP-` is wrong in a project that uses `BZW-1`. Read it every time.
+⚠️ **Never hardcode a prefix.** `ABC-` is wrong in a project that uses `XYZ-1`. Read it every time.
 
 ## 2a. Vault backend
 
@@ -90,9 +89,6 @@ Decision order:
    list and **ask** which one to work on. Do not choose.
 3. Neither → say there is no active task and stop.
 
-⚠️ Step 2 is a bug fix. A version that looked only for `-active.md` reported "no active task" in a
-repository holding ten live task files, and exited.
-
 ## 2c. Check that the backend actually serves the declared vault
 
 When `backend` is `vault`, two settings answer the same question and they do **not** consult each
@@ -135,9 +131,9 @@ server answers correctly, the query is well-formed, and the result is genuinely 
 it was asked in the wrong place. An empty answer and a wrong-place answer look identical, so the
 only defence is checking before you conclude.
 
-⚠️ Measured, not hypothetical: a server started without an explicit vault fell back to a
-configured default that was a *different* vault, and the tooling reported "no work to do" while
-the tasks were plainly visible in the app.
+⚠️ A server started without an explicit vault serves the configured default vault, which can be
+a *different* vault from the declared one — the query then reports "no work to do" while the
+tasks are plainly visible in the app.
 
 ## 3. Reality check before writing code
 
@@ -163,18 +159,14 @@ declaration, list it for the user and ask where it belongs. Do not start it — 
 to a separate session of its own either.
 
 ⚠️ Work started outside the task list is invisible to everyone who checks the task list,
-including the overlap check in *parallel work*. Measured: a finding handed off as a one-click
-"start this in its own session" was fixed there while the same defect was being fixed here. The
-task list showed nothing active, so neither side saw the other, and one of the two fixes was
-thrown away.
+including the overlap check in *parallel work* — the same defect can then be fixed twice, in
+parallel, and one of the fixes thrown away.
 
 ## 5. Verification commands come from the project
 
 ⚠️ **Never hardcode a language's tooling.** Look, in order, at `package.json` scripts
 (`test` · `lint` · `typecheck`), `Makefile` targets, and the project's agent instructions file.
 If you cannot find them, **ask**.
-
-A version of this text had Go commands baked in and proposed them in a TypeScript repository.
 
 ## 6. Closing a sub-task
 

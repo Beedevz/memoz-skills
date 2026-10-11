@@ -5,8 +5,8 @@ report, including your own.
 
 This is the **orchestrator's** side. The people (or agents) doing the work have their own rules;
 the orchestrator is the one who decides what runs in parallel, verifies what comes back, and asks
-the human for approval. In the pilot that produced this text, most mistakes happened on this side,
-and this side was the one that was not written down.
+the human for approval. Most coordination mistakes happen on this side. (Several steps below cite
+*the pilot*: the trial run this protocol was written from.)
 
 ## The shape
 
@@ -43,7 +43,7 @@ The task note carries the coordination state, so it survives a lost session:
   Every agent that touches notes gets this server named in its prompt.
 - [ ] Write a task note per piece: `status: doing`, `branch`, `worktree`, `files`, `stage: implementing`. Scope, contracts and *Not Doing* go in the note.
 - [ ] List the other `doing` tasks. Intersect their `files` with this one's, and with the project's **hot files** (`hotFiles` in `.memoz/tasks.json` — shared files and how each is resolved).
-- [ ] ⚠️ **An empty `doing` list does not mean nobody is on it.** Work started outside this protocol has no task note, so the step above cannot see it. Also look for open merge/pull requests and remote branches touching the same files (`git fetch --prune`, then the forge's list of open requests). Found one → stop and tell the human. In the case that produced this step, the other request had been open for hours; one listing would have shown it.
+- [ ] ⚠️ **An empty `doing` list does not mean nobody is on it.** Work started outside this protocol has no task note, so the step above cannot see it. Also look for open merge/pull requests and remote branches touching the same files (`git fetch --prune`, then the forge's list of open requests). Found one → stop and tell the human. Do the listing every time: a request can stay open for hours without touching the task notes, and one listing is enough to show it.
 - [ ] ⛔ **If they intersect, do not start in parallel — ask the human.** Show, for each shared file: which pieces touch it, whether it is a hot file and how it resolves, the proposed merge order, and what running them one after another would cost. Run in parallel only on approval; otherwise run them in sequence. No intersection → no approval needed (just say so).
   ⚠️ "It is a hot file, it regenerates" does **not** replace approval. That a resolution exists does not mean the collision was accepted — and the first resolution proposed for a hot file in the pilot turned out to be wrong.
 - [ ] Create the worktree from the up-to-date base branch; install dependencies there (a fresh worktree has none).
@@ -82,9 +82,3 @@ The task note carries the coordination state, so it survives a lost session:
 
 - [ ] Ask the human how to classify each candidate recurring mistake — new shape, or another occurrence of an existing one — and record it (see the recurring-mistake log).
 - [ ] Remove merged worktrees and their local branches — with the human's approval, after confirming each is clean and its branch is on the base branch.
-
-## Measured in the pilot
-
-- The reviewer found at least one real, verified problem in most runs — including a regression the implementer's green tests could not see (a CLI that swallowed a renamed flag) and blind spots in the very gate that was supposed to enforce the rule.
-- A hot file two parallel pieces both appended to: in the one real run, the additions were far apart and git merged the file on its own. A conflict was produced only in a **simulation** with adjacent additions, and there the regenerate command resolved it correctly — a real conflict has not yet been observed. The regenerate step is mandatory after every merge either way.
-- Most orchestrator-side mistakes were measurement mistakes: a pipe that swallowed an exit code, a shell alias that parsed flags differently, an empty result read as clean.
