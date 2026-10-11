@@ -1,6 +1,6 @@
 ---
 name: memoz-task-flow
-description: "Find the active task from the project's .memoz/tasks.json declaration and work on exactly one. Use when starting, continuing or closing work in a project tracked with Memoz. Never guesses where work lives."
+description: "Entry point for work in a project tracked with Memoz: find the active task from the project's .memoz/tasks.json declaration, work on exactly one, checkpoint its record after every step, close it, and route several pieces at once to parallel work. Use when starting, continuing or closing work. Never guesses where work lives."
 ---
 
 <!-- GENERATED from core/task-flow.md — do not edit. Run: node scripts/render.mjs -->
@@ -8,6 +8,31 @@ description: "Find the active task from the project's .memoz/tasks.json declarat
 # Task flow
 
 Find the active task, work on exactly one, and never invent where work lives.
+
+## The lifecycle
+
+This skill is the entry point: it carries one task from start to close, and hands several pieces
+at once to *parallel work*.
+
+| phase | what happens | where |
+|---|---|---|
+| **Start** | read the declaration · pick one task · check it is not under way elsewhere · mark it `doing` with its `branch` and `worktree` | §1–§4 |
+| **Work** | a checkpoint in the task record after every finished step | §5 |
+| **Finish** | criteria ticked or `[~]` · the closure · the closed status, on the user's word | §7, then the closure skill |
+
+`status` and `stage` exist **only in the vault backend** (§2a). Use these values; invent no others:
+
+- `status`: `todo` → `doing` → `review` (waiting for the human: approval, merge) → the vault's
+  closed status (`done`, `dropped`, … — read which ones the vault uses; never assume one).
+- `stage`, while `doing`: `implementing` → `agent-review` (only when a reviewer agent runs) →
+  `verified` (the verification passed). A merge is a checkpoint line, not a stage.
+
+The repo backend (§2b) is outside the lifecycle: there a checkpoint is a ticked checkbox plus a
+dated line in the task file. Do not invent frontmatter for it.
+
+**Several pieces at once** — the user asks for more than one, or more than one ready task should
+run together → *parallel work*. The lifecycle is the same per piece: each has its own task
+record, branch and worktree, and the orchestrator writes each piece's checkpoints.
 
 ## 1. Read the declaration
 
@@ -49,16 +74,24 @@ to the wrong server answers correctly, about the wrong vault.
 
 - `list_tasks(status: "doing")` → the active task — exactly one per working directory. Several
   are normal when work runs in parallel, each in its own worktree.
+- `list_tasks(status: "review")` → waiting for the human. List them for the user; for one that
+  has merged, offer to close it — or report it, if §7 says so — before new work.
 - `list_tasks(status: "todo")` → what is queued.
 
 - **One `doing`** → that is the focus. Read the note; scope and *Not Doing* live there.
 - **More than one `doing`** → if the notes carry a `worktree` field, the focus is the one whose
   `worktree` is the current checkout (`git rev-parse --show-toplevel`). Compare **resolved** paths,
   not strings — a path through a symlink (`/tmp` → `/private/tmp` on macOS) names the same
-  directory but does not compare equal. Otherwise — or if none or several match — **ask**. Do not
+  directory but does not compare equal. An empty `worktree` means the main checkout: compare it
+  as the main checkout's resolved path. Otherwise — or if none or several match — **ask**. Do not
   choose.
 - **No `doing`** → show the `todo` list by priority and **ask**. Do not start on your own.
-- Mark the chosen task `doing` before working.
+- Check that the chosen task is not under way elsewhere (§4). **Starting** it (`todo` → `doing`):
+  then, in one write, set `status: doing`, `stage: implementing`, `branch`, and `worktree` — the
+  resolved absolute path of the linked worktree you work in, or empty in the main checkout.
+  **Resuming** a `doing` task: if it is a piece of parallel work and this is a new session, stop
+  and ask the user how to continue first — before §4; otherwise the check in §4 runs too. Leave
+  `stage` as it is.
 
 ⚠️ In this backend "active" is a **field**, not a filename. Searching for `*-active.md` is
 meaningless here.
@@ -66,10 +99,12 @@ meaningless here.
 ⚠️ Sub-tasks may be separate notes (`<prefix>-NN/T<k> — …`) or sections inside the parent note.
 Both are valid — read which one this project uses; do not impose a shape.
 
-When work runs in parallel, a task note also carries `branch`, `worktree`, `files` (the paths it
-claims) and `stage` (`implementing` → `agent-review` → `verified`). The rule is **one `doing` per
-worktree** — two active tasks in one working directory cannot be told apart. Only the orchestrator
-writes these fields. See *parallel work*.
+Every task note in progress carries `branch` and `worktree` as information — the check in §4
+shows them to the user. A piece of parallel work also carries `files` (the paths it claims). The rule is **one
+`doing` per worktree** — two active tasks in one working directory cannot be told apart. Under
+parallel work only the orchestrator writes these fields, `status`, `stage` and the checkpoints; a
+session resuming a piece stops and asks the user how to continue — before any other step, §4
+included.
 
 ## 2b. Repo backend
 
@@ -153,6 +188,21 @@ Verify the selected task's checklist **against the code**, not against the check
 The session's scope is the selected task only. Respect the parent task's *Not Doing* list as a
 hard fence.
 
+**Check that it is not under way elsewhere — when you start or resume the task, not when the
+session starts.** An empty `doing` list is not enough: look at `review` tasks too, and at remote
+branches and open merge/pull requests touching the same files (`git fetch --prune`, then the
+forge's list of open requests). Records that carry `files` are intersected with the files this
+task touches; a record without `files` (single-session work) cannot be, so list it and the open
+requests for the user instead of reporting no overlap.
+
+**Nothing passes without being shown.** Show the user everything found — the task's own branch
+and open request included, and every overlap — and let the user decide. A record does not say
+which session works from it: a second session on the same task looks exactly like this one.
+Continuing from a checkout other than the record's (compare resolved paths, §2a) → ask the user;
+the record's `branch` and `worktree` stay as they are. Before working in that checkout on the
+user's approval, show any `doing` task whose `worktree` is that checkout and ask — one `doing` per
+worktree. An empty `worktree` is the main checkout (§2a).
+
 If you notice work missing elsewhere, **record it as a task** where the declaration says work is
 tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no
 declaration, list it for the user and ask where it belongs. Do not start it — and do not hand it
@@ -162,17 +212,39 @@ to a separate session of its own either.
 including the overlap check in *parallel work* — the same defect can then be fixed twice, in
 parallel, and one of the fixes thrown away.
 
-## 5. Verification commands come from the project
+## 5. Checkpoint after each step
+
+When a step finishes — a commit, a merge/pull request opened, a merge, a measurement round, a
+decision by the user — update the task record **before starting the next step**:
+
+- tick the checkbox that is now done (surgically, §7);
+- move `status` / `stage` if the step moved it (*The lifecycle*) — vault backend only;
+- add one dated line with the observed result, e.g. `2026-01-14 — opened #42; pipeline green at a1b2c3d`.
+
+Write from the result you observed — the output, the link, the commit — not from what you expected
+the step to produce. A line written ahead of its result is a claim nobody checked.
+
+If the record cannot be written — the knowledge layer is unreachable, the write is refused — say so
+and **stop**. Do not continue untracked.
+
+⚠️ A session can end after any step. The record is all that the next session — and the check in
+§4 — will know about where the work stands.
+
+## 6. Verification commands come from the project
 
 ⚠️ **Never hardcode a language's tooling.** Look, in order, at `package.json` scripts
 (`test` · `lint` · `typecheck`), `Makefile` targets, and the project's agent instructions file.
 If you cannot find them, **ask**.
 
-## 6. Closing a sub-task
+## 7. Finishing: sub-tasks and the task
 
 - Tick only the checkboxes that are genuinely done — **surgically**. Never round-trip a note
   through parse-and-serialize: it destroys comments, nested keys and anything non-flat.
 - A criterion you could not close is written as `[~]` **with the reason**. Presenting it as closed
   is the most expensive mistake in this workflow.
-- "Done" is the user's call. You report what was done and what appears finished.
+- Closing is the user's call. You report what was done and what appears finished.
 - Never commit without showing the message first.
+- Once the user agrees: write the closure (the closure skill says where it goes), then set the
+  closed status the user chose — in that order.
+- **A task in `review` may be closed from any session — only after asking the user.** Except a
+  parallel piece: its orchestrator or the user closes it; any other session only reports it.

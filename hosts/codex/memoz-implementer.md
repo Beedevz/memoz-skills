@@ -41,15 +41,22 @@ you which vault is behind it. Check before you start, not after the work:
   - ⚠️ **Order:** run `regenerate` commands after conflicts in the source files are resolved — they
     scan the working tree, and on a conflicted source they record both sides.
   - ⚠️ **A gate's baseline is a ratchet.** Its write mode writes unconditionally, whatever it
-    finds. If a baseline file conflicts, take the base branch's side and run the gate in *check*
-    mode first. If it reports any **new** violation, fix it and do not write the baseline. Write
-    only when the sole complaint is that entries were cleaned up but not tightened. Comparing
-    counts is not enough: fixing two violations and adding one lowers the count and still writes
-    the new one in — and a violation written into the baseline turns the gate green.
+    finds. So **before every baseline write you make** — because your own change moved it, or
+    after a conflict handed to you (take the base branch's side first) — run the gate in *check*
+    mode. Fix every **new** violation it reports and run *check* again.
+    Write the baseline only when the sole complaint is that entries were cleaned up but not
+    tightened. Comparing counts is not enough: fixing two violations and adding one lowers the
+    count and still writes the new one in — and a violation written into the baseline turns the
+    gate green. Clean merges and the regenerate step after them are the orchestrator's.
 - **Dependencies:** a new worktree has none. Install them with the lockfile frozen, and never commit
   the lockfile as a side effect.
-- **Do not:** push · merge · edit the task note's frontmatter (`status` · `stage` · `files` — the
-  orchestrator owns those, and rewriting a note is not surgical) · print secret values.
+- **Do not:** push · merge · write checkpoints · run the concurrent-work check (task-flow §4) — it
+  ends in a decision by the user, whom you cannot reach; the orchestrator runs it · edit the task
+  note's frontmatter (`status` · `stage` · `branch` · `worktree` · `files` — the orchestrator owns
+  those; rewriting a note is not surgical) · print secret values. The only thing you write into the
+  task note is your report.
+- **Do** run the reality check (task-flow §3) before writing code: verify the piece's checklist
+  against the code; on drift, stop and report it (the report's **Drift** line).
 - You **may** commit on your own branch. Write the message to a file first and commit it with a
   separate command.
 
@@ -65,7 +72,8 @@ Take commands from the project; do not invent them. For every tool:
 - **Show `git status --short` empty, with its output, before you report done.** Moving a file and
   then editing it are two stages; the second one is easy to leave uncommitted.
 - **Count per file and line, not per block.** "N matches" means N lines, each classified (archive,
-  fixture, or live document). A summary of "six matches, all archived" once hid a live runbook.
+  fixture, or live document). A summary per block hides the one live line among archived ones.
+  *Observed in the pilot.*
 - **Every claim in the commit subject and the report is measured.**
 - ⚠️ **After a rename, count every occurrence of the old name as a substring**, not only as a whole
   word. A language-server rename expands the shorthand `{ old }` into `{ new: old }`, keeping the
@@ -74,8 +82,8 @@ Take commands from the project; do not invent them. For every tool:
 - ⚠️ **For every new name you introduce, search by name for what it might shadow** — same scope,
   same file, and (where the language shares scope across files) every file of the package, tests
   included. Shadowing is valid code: types, tests and mutation do not see it. Do not rely on a
-  shadow analyser alone — one widely used analyser stays silent when the two declarations have
-  different types, and the one real case it was checked against was exactly of that kind.
+  shadow analyser alone — a widely used one stays silent when the two declarations have different
+  types, which is exactly the case it is needed for. *Observed in the pilot.*
 - ⚠️ **Mutate only a clean file, or back it up first.** Undoing a mutation with a checkout from the
   last commit also deletes any uncommitted real work in the same file. Restore from your backup.
 - Write every claim you could not verify as **not verified** — never drop it silently.
@@ -87,7 +95,8 @@ verbatim). If the write fails, put the full report in your last message instead.
 
 ```
 ### Implementer report — <piece> · <date> · <model>
-**Branch / commit:** <branch> · <short hash>
+**Branch / commit:** <branch> · <short hash> | none (stopped: <reason — drift, wrong branch, …>)
+**Drift:** <none | what the reality check (task-flow §3) found — (stopped)>
 **What changed:** <numbers — measured, not estimated>
 **Files touched:** <count> · outside `files`: <none | list>
 **Hot files:** <which · how resolved>
