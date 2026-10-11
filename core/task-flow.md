@@ -75,13 +75,16 @@ to the wrong server answers correctly, about the wrong vault.
 - **More than one `doing`** → if the notes carry a `worktree` field, the focus is the one whose
   `worktree` is the current checkout (`git rev-parse --show-toplevel`). Compare **resolved** paths,
   not strings — a path through a symlink (`/tmp` → `/private/tmp` on macOS) names the same
-  directory but does not compare equal. Otherwise — or if none or several match — **ask**. Do not
+  directory but does not compare equal. An empty `worktree` means the main checkout: compare it
+  as the main checkout's resolved path. Otherwise — or if none or several match — **ask**. Do not
   choose.
 - **No `doing`** → show the `todo` list by priority and **ask**. Do not start on your own.
 - Check that the chosen task is not under way elsewhere (§4). **Starting** it (`todo` → `doing`):
   then, in one write, set `status: doing`, `stage: implementing`, `branch`, and `worktree` — the
   resolved absolute path of the linked worktree you work in, or empty in the main checkout.
-  **Resuming** a `doing` task: the check in §4 runs too; leave `stage` as it is.
+  **Resuming** a `doing` task: if it is a piece of parallel work and this is a new session, stop
+  and ask the user how to continue first — before §4; otherwise the check in §4 runs too. Leave
+  `stage` as it is.
 
 ⚠️ In this backend "active" is a **field**, not a filename. Searching for `*-active.md` is
 meaningless here.
@@ -93,7 +96,8 @@ Every task note in progress carries `branch` and `worktree` as information — t
 shows them to the user. A piece of parallel work also carries `files` (the paths it claims). The rule is **one
 `doing` per worktree** — two active tasks in one working directory cannot be told apart. Under
 parallel work only the orchestrator writes these fields, `status`, `stage` and the checkpoints; a
-session resuming a piece stops and asks the user how to continue.
+session resuming a piece stops and asks the user how to continue — before any other step, §4
+included.
 
 ## 2b. Repo backend
 
@@ -190,8 +194,7 @@ which session works from it: a second session on the same task looks exactly lik
 Continuing from a checkout other than the record's (compare resolved paths, §2a) → ask the user;
 the record's `branch` and `worktree` stay as they are. Before working in that checkout on the
 user's approval, show any `doing` task whose `worktree` is that checkout and ask — one `doing` per
-worktree. A record with an empty `worktree` works in the main checkout: compare it as
-the main checkout's resolved path.
+worktree. An empty `worktree` is the main checkout (§2a).
 
 If you notice work missing elsewhere, **record it as a task** where the declaration says work is
 tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no

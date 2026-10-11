@@ -69,7 +69,7 @@ request opened · a merge.
 ## 3. When results come back — verify, do not forward
 
 - [ ] **Where is the implementer's report?** If it could not reach the note, its last message carries the full report — record it through the server you settled on. If it stopped because that server reports a *different* vault than the declared one, your settling was wrong: settle again (§1) before recording anything.
-- [ ] **Did it stop on drift?** If the report's **Drift** line ends in *(stopped)*, take the drift to the human and do not move the piece to agent review until they decide.
+- [ ] **Did it stop?** If any line of the report is marked *(stopped)* — drift, wrong branch or any other reason — take it to the human and do not move the piece to agent review until they decide.
 - [ ] **Is the tree actually clean?** ⚠️ An empty result is not a clean result: `git status | wc -l` printing `0` also happens when the command errored. Take the exit code, or look for something that is always there (a known positive) in the same query. An implementer can report "done" with its last edit never committed, and this check is what shows it. *Observed in the pilot.*
 - [ ] **Does the diff stay inside `files`?** Anything outside is either a scope change the human should hear about, or a mistake.
 - [ ] **Re-measure the key claims yourself** — counts, "zero left", "tests unchanged". Compare test *counts* before and after, not just pass/fail: a renamed test file that stops being discovered still leaves the suite green.
