@@ -54,8 +54,8 @@ a reason. Both are worth writing. Silence is not.
 
 ## Where the record goes
 
-**Ask the falsified-assumptions question first** — its answer decides the place. Then take the
-first row that matches and write the record there, once:
+**Ask the falsified-assumptions question first**, before choosing the place. Then take the first
+row that matches and write the record there, once:
 
 | the work being closed… | where the record goes |
 |---|---|

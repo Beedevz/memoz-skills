@@ -85,9 +85,11 @@ to the wrong server answers correctly, about the wrong vault.
   directory but does not compare equal. Otherwise — or if none or several match — **ask**. Do not
   choose.
 - **No `doing`** → show the `todo` list by priority and **ask**. Do not start on your own.
-- Check that the chosen task is not under way elsewhere (§4). Then, in one write, set
-  `status: doing`, `stage: implementing`, `branch`, and `worktree` — the resolved absolute path of
-  the linked worktree you work in, or empty in the main checkout.
+- Check that the chosen task is not under way elsewhere (§4). **Starting** it (`todo` → `doing`):
+  then, in one write, set `status: doing`, `stage: implementing`, `branch`, and `worktree` — the
+  resolved absolute path of the linked worktree you work in, or empty in the main checkout.
+  **Resuming** a `doing` task: leave `stage`, `branch` and `worktree` as they are; if the current
+  checkout is not the record's `worktree`, ask the user before working on it.
 
 ⚠️ In this backend "active" is a **field**, not a filename. Searching for `*-active.md` is
 meaningless here.
@@ -185,11 +187,19 @@ hard fence.
 **Check that it is not under way elsewhere — when you start or resume the task, not when the
 session starts.** An empty `doing` list is not enough: look at `review` tasks too, and at remote
 branches and open merge/pull requests touching the same files (`git fetch --prune`, then the
-forge's list of open requests). Anything found → stop and ask the user, with one exception: the
-task's own branch and request (the record's `branch`) pass silently **only when the current
-checkout is the record's `worktree`** — compare resolved paths (§2a). With an empty `worktree`
-(work in the main checkout), show the own branch and request to the user too: from there, a second
-session on the same task looks exactly like this one.
+forge's list of open requests). Records that carry `files` are intersected with the files this
+task touches; a record without `files` (single-session work) cannot be, so list it and the open
+requests for the user instead of reporting no overlap.
+
+Anything found → stop and ask the user, with two exceptions that pass silently:
+
+- the task's own branch and request (the record's `branch`), **only when the current checkout is
+  the record's `worktree`** — compare resolved paths (§2a);
+- for an orchestrator, the records of the pieces it started in this session, with their branches
+  and requests — it owns them (*parallel work*).
+
+With an empty `worktree` (work in the main checkout), show the own branch and request to the user
+too: from there, a second session on the same task looks exactly like this one.
 
 If you notice work missing elsewhere, **record it as a task** where the declaration says work is
 tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no
@@ -236,4 +246,5 @@ If you cannot find them, **ask**.
   closed status the user chose — in that order.
 - **A task in `review` is closed only by its owner:** the session whose current checkout is the
   record's `worktree` (resolved paths), or the orchestrator of that piece. Any other session lists
-  it and tells the user. With an empty `worktree`, ask the user before closing it (§4).
+  it and tells the user. When the `worktree` is empty or no longer exists, or the task had no
+  orchestrator (single-session work), ask the user; on their word, this session may close it.

@@ -41,17 +41,19 @@ you which vault is behind it. Check before you start, not after the work:
   - ⚠️ **Order:** run `regenerate` commands after conflicts in the source files are resolved — they
     scan the working tree, and on a conflicted source they record both sides.
   - ⚠️ **A gate's baseline is a ratchet.** Its write mode writes unconditionally, whatever it
-    finds. So **before every baseline write** — after a conflict (take the base branch's side
-    first), after a clean merge, by a `regenerate` command, or because your own change moved it —
-    run the gate in *check* mode. Fix every **new** violation it reports and run *check* again.
+    finds. So **before every baseline write you make** — because your own change moved it, or
+    after a conflict handed to you (take the base branch's side first) — run the gate in *check*
+    mode. Fix every **new** violation it reports and run *check* again.
     Write the baseline only when the sole complaint is that entries were cleaned up but not
     tightened. Comparing counts is not enough: fixing two violations and adding one lowers the
     count and still writes the new one in — and a violation written into the baseline turns the
-    gate green.
+    gate green. Clean merges and the regenerate step after them are the orchestrator's.
 - **Dependencies:** a new worktree has none. Install them with the lockfile frozen, and never commit
   the lockfile as a side effect.
-- **Do not:** push · merge · edit the task note's frontmatter (`status` · `stage` · `files` — the
-  orchestrator owns those, and rewriting a note is not surgical) · print secret values.
+- **Do not:** push · merge · run the task-flow skill's checkpoints · edit the task note's
+  frontmatter (`status` · `stage` · `branch` · `worktree` · `files` — the orchestrator owns those
+  and writes every checkpoint; rewriting a note is not surgical) · print secret values. The only
+  thing you write into the task note is your report.
 - You **may** commit on your own branch. Write the message to a file first and commit it with a
   separate command.
 

@@ -41,9 +41,8 @@ The task note carries the coordination state, so it survives a lost session:
 **One `doing` per worktree.** Two active tasks in one working directory cannot be told apart.
 
 The lifecycle — `status` and `stage` values, the checkpoint after each step, the closure — is the
-task-flow skill's; here it runs per piece. **The orchestrator writes each piece's checkpoints**:
-when a piece's commit is verified, its reviewer report recorded, its branch pushed or merged,
-update that piece's note before the next step.
+task-flow skill's; here it runs per piece. **The orchestrator writes each piece's checkpoints** —
+at the steps the task-flow skill's §5 names, into that piece's note, before the next step.
 
 ## 1. Before anything starts
 
@@ -53,12 +52,12 @@ update that piece's note before the next step.
   3. otherwise (no candidate, or several that do not report) → **ask the human**. Picking one of several unreporting servers is the wrong-vault risk this step exists to remove.
 
   Every agent that touches notes gets this server named in its prompt.
-- [ ] Write a task note per piece: `status: doing`, `branch`, `worktree`, `files`, `stage: implementing`. Scope, contracts and *Not Doing* go in the note.
-- [ ] List the other `doing` and `review` tasks. Intersect their `files` with this one's, and with the project's **hot files** (`hotFiles` in `.memoz/tasks.json` — shared files and how each is resolved).
-- [ ] ⚠️ **An empty `doing` list does not mean nobody is on it.** Work started outside this protocol has no task note, so the step above cannot see it. Also look for open merge/pull requests and remote branches touching the same files (`git fetch --prune`, then the forge's list of open requests). Found one → stop and tell the human, unless it is one of the pieces you started — its note's `branch` and `worktree` name it (ownership as in the task-flow skill). Do the listing every time: a request can stay open for hours without touching the task notes, and one listing is enough to show it.
-- [ ] ⛔ **If they intersect, do not start in parallel — ask the human.** Show, for each shared file: which pieces touch it, whether it is a hot file and how it resolves, the proposed merge order, and what running them one after another would cost. Run in parallel only on approval; otherwise run them in sequence. No intersection → no approval needed (just say so).
+- [ ] Write a task note per piece, still `status: todo`: scope, contracts, *Not Doing* and `files`.
+- [ ] List the other `doing` and `review` tasks. Intersect the `files` of those that carry them with each piece's, and with the project's **hot files** (`hotFiles` in `.memoz/tasks.json` — shared files and how each is resolved). A task without `files` (single-session work) cannot be intersected — list it for the human instead of claiming no overlap.
+- [ ] ⚠️ **An empty `doing` list does not mean nobody is on it.** Work started outside this protocol has no task note, so the step above cannot see it. Also look for open merge/pull requests and remote branches touching the same files (`git fetch --prune`, then the forge's list of open requests). Found one → stop and tell the human, unless it belongs to a piece you started in this session (the exception in the task-flow skill's §4). Do the listing every time: a request can stay open for hours without touching the task notes, and one listing is enough to show it.
+- [ ] ⛔ **If they intersect, do not start in parallel — ask the human.** Show, for each shared file: which pieces touch it, whether it is a hot file and how it resolves, the proposed merge order, and what running them one after another would cost. Run in parallel only on approval; otherwise run them in sequence. No intersection and nothing left un-intersected → no approval needed (just say so).
   ⚠️ "It is a hot file, it regenerates" does **not** replace approval. That a resolution exists does not mean the collision was accepted — and the first resolution proposed for a hot file can be wrong. *Observed in the pilot.*
-- [ ] Create the worktree from the up-to-date base branch; install dependencies there (a fresh worktree has none).
+- [ ] Only then, per piece: create the worktree from the up-to-date base branch, and in one write set its note to `status: doing`, `stage: implementing`, `branch`, `worktree`. Install dependencies there (a fresh worktree has none).
 - [ ] **Read how your tools resolve paths.** A script with the repository path written into it will, when run from a worktree, modify the *main* checkout. Give agents copies that resolve from the current directory, and test each one against a known positive.
 - [ ] ⚠️ **Return your own shell to the main checkout before starting an agent.** Sub-agents inherit the orchestrator's working directory: a shell left in one piece's worktree starts the next agent inside another piece's work. *Observed in the pilot.*
 
@@ -88,7 +87,7 @@ update that piece's note before the next step.
 - [ ] Push from the worktree **normally**, so the hooks run. Never skip hooks.
 - [ ] After pushing, confirm the remote head is the new commit. ⚠️ Filtering push output through a pipe can cut the push short; write it to a file, then read it.
 - [ ] **Pieces that share a hot file merge in the agreed order.** The later one takes the base branch and runs every `regenerate` command — **whether or not git reported a conflict**. Git merging a hot file cleanly does not mean the file's own contract (sorted, unique, generated) still holds.
-  ⚠️ **If the hot file is a gate's baseline, regenerating it is a baseline write** — the same rule as the implementer's: run the gate in *check* mode first, fix every **new** violation and run *check* again, and write only when the sole complaint is "cleaned up but not tightened". A write mode writes whatever it finds, so a violation regenerated into the baseline turns the gate green.
+  ⚠️ **If the hot file is a gate's baseline, the clean merge and the regenerate step are baseline writes** — and they are yours, not the implementer's. The same rule as its own writes: run the gate in *check* mode first, have every **new** violation fixed (by the piece's implementer, §3) and run *check* again, and write only when the sole complaint is "cleaned up but not tightened". A write mode writes whatever it finds, so a violation regenerated into the baseline turns the gate green.
 - [ ] Describe the change for the human: what, which contracts remain, reviewer findings and how they were verified, measurements. Then set the task to `status: review`.
 
 ## 5. Closing

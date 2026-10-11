@@ -124,7 +124,7 @@ conversation, not a record.
 
 | agent | does | never does |
 |---|---|---|
-| `memoz-implementer` | one piece, in its own worktree; report into the task note | push · merge · change task status |
+| `memoz-implementer` | one piece, in its own worktree; report into the task note | push · merge · change task status · write checkpoints |
 | `memoz-reviewer` | an independent, adversarial read of the diff — contracts the compiler cannot see; returns its report as its last message | change code · open the task note |
 
 Hosts without sub-agents get the same role text as flat prompts under `hosts/codex/`.
