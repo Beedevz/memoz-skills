@@ -12,8 +12,8 @@ report, including your own.
 
 This is the **orchestrator's** side. The people (or agents) doing the work have their own rules;
 the orchestrator is the one who decides what runs in parallel, verifies what comes back, and asks
-the human for approval. Most coordination mistakes happen on this side. (Several steps below cite
-*the pilot*: the trial run this protocol was written from.)
+the human for approval. In the pilot, most coordination mistakes happened on this side.
+(Several steps below cite *the pilot*: the trial run this protocol was written from.)
 
 ## The shape
 

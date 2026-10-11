@@ -93,11 +93,10 @@ Every project that uses these skills carries one small file:
 
 **If the file is missing, the skills stop and ask.** They never guess.
 
-That rule is not politeness — it is a bug fix. An earlier version inferred the backend from the
-filesystem and got it wrong twice. The second time it picked the vault in *every* directory,
-because an MCP server is reachable process-wide: run it in an unrelated project and it would
-quietly adopt **another project's** tasks. Reachability is a *capability*; ownership is a
-*declaration*, and only the project can make it.
+The reason is not politeness. An MCP server is reachable from every directory, so detecting the
+backend from what is reachable would, in an unrelated project, silently adopt **another
+project's** tasks. Reachability is a *capability*; ownership is a *declaration*, and only the
+project can make it.
 
 ## Skills
 

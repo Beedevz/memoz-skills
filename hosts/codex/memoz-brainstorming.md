@@ -65,9 +65,8 @@ and the record of it:
 - **the open questions** that were not resolved — written down rather than dropped
 - **what would reopen it**
 
-Record the decision, the rejected options and what would reopen it with the decision-record
-skill, and keep the open questions in that same record as a list of their own; do not invent a
-second format for the same thing.
+Hand the last four to the decision-record skill; do not invent a second format for the same
+thing.
 
 ⚠️ Open questions are the part most often lost. A question that surfaced during a discussion and
 was never answered does not disappear — it comes back as a surprise during implementation. Write

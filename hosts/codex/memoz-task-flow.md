@@ -128,9 +128,9 @@ server answers correctly, the query is well-formed, and the result is genuinely 
 it was asked in the wrong place. An empty answer and a wrong-place answer look identical, so the
 only defence is checking before you conclude.
 
-⚠️ A server started without an explicit vault serves the configured default vault, which can be
-a *different* vault from the declared one — the query then reports "no work to do" while the
-tasks are plainly visible in the app.
+⚠️ Observed: a server started without an explicit vault fell back to a configured default that
+was a *different* vault, and the tooling reported "no work to do" while the tasks were plainly
+visible in the app.
 
 ## 3. Reality check before writing code
 

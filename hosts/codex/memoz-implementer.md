@@ -40,10 +40,12 @@ you which vault is behind it. Check before you start, not after the work:
   a `serialize` file, say so in the report.
   - ⚠️ **Order:** run `regenerate` commands after conflicts in the source files are resolved — they
     scan the working tree, and on a conflicted source they record both sides.
-  - ⚠️ **A gate's baseline is a ratchet.** If a baseline file conflicts, take the base branch's
-    side and re-run the gate against it. Write a new baseline only when it records fewer
-    violations than the base branch's, never more — an increase written into the baseline turns
-    the gate green.
+  - ⚠️ **A gate's baseline is a ratchet.** Its write mode writes unconditionally, whatever it
+    finds. If a baseline file conflicts, take the base branch's side and run the gate in *check*
+    mode first. If it reports any **new** violation, fix it and do not write the baseline. Write
+    only when the sole complaint is that entries were cleaned up but not tightened. Comparing
+    counts is not enough: fixing two violations and adding one lowers the count and still writes
+    the new one in — and a violation written into the baseline turns the gate green.
 - **Dependencies:** a new worktree has none. Install them with the lockfile frozen, and never commit
   the lockfile as a side effect.
 - **Do not:** push · merge · edit the task note's frontmatter (`status` · `stage` · `files` — the
