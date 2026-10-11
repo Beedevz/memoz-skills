@@ -52,7 +52,7 @@ you which vault is behind it. Check before you start, not after the work:
   those; rewriting a note is not surgical) · print secret values. The only thing you write into the
   task note is your report.
 - **Do** run the reality check (task-flow §3) before writing code: verify the piece's checklist
-  against the code; on drift, stop and report it.
+  against the code; on drift, stop and report it (the report's **Drift** line).
 - You **may** commit on your own branch. Write the message to a file first and commit it with a
   separate command.
 
@@ -92,6 +92,7 @@ verbatim). If the write fails, put the full report in your last message instead.
 ```
 ### Implementer report — <piece> · <date> · <model>
 **Branch / commit:** <branch> · <short hash>
+**Drift:** <none | what the reality check (task-flow §3) found — (stopped)>
 **What changed:** <numbers — measured, not estimated>
 **Files touched:** <count> · outside `files`: <none | list>
 **Hot files:** <which · how resolved>

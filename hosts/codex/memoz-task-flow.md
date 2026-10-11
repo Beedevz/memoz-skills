@@ -72,7 +72,7 @@ to the wrong server answers correctly, about the wrong vault.
 - `list_tasks(status: "doing")` → the active task — exactly one per working directory. Several
   are normal when work runs in parallel, each in its own worktree.
 - `list_tasks(status: "review")` → waiting for the human. List them for the user; for one that
-  has merged, offer to close it (§7) before new work.
+  has merged, offer to close it — or report it, if §7 says so — before new work.
 - `list_tasks(status: "todo")` → what is queued.
 
 - **One `doing`** → that is the focus. Read the note; scope and *Not Doing* live there.
@@ -97,7 +97,7 @@ Every task note in progress carries `branch` and `worktree` as information — t
 shows them to the user. A piece of parallel work also carries `files` (the paths it claims). The rule is **one
 `doing` per worktree** — two active tasks in one working directory cannot be told apart. Under
 parallel work only the orchestrator writes these fields, `status`, `stage` and the checkpoints; a
-session resuming a piece asks first whether it is the orchestrator (*parallel work* §1).
+session resuming a piece stops and asks the user how to continue.
 
 ## 2b. Repo backend
 
@@ -192,7 +192,9 @@ requests for the user instead of reporting no overlap.
 and open request included, and every overlap — and let the user decide. A record does not say
 which session works from it: a second session on the same task looks exactly like this one.
 Continuing from a checkout other than the record's (compare resolved paths, §2a) → ask the user;
-the record's `branch` and `worktree` stay as they are.
+the record's `branch` and `worktree` stay as they are. Before working in that checkout on the
+user's approval, show any `doing` task whose `worktree` is that checkout and ask — one `doing` per
+worktree.
 
 If you notice work missing elsewhere, **record it as a task** where the declaration says work is
 tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no
@@ -237,4 +239,5 @@ If you cannot find them, **ask**.
 - Never commit without showing the message first.
 - Once the user agrees: write the closure (the closure skill says where it goes), then set the
   closed status the user chose — in that order.
-- **A task in `review` may be closed from any session — only after asking the user.**
+- **A task in `review` may be closed from any session — only after asking the user.** Except a
+  parallel piece: its orchestrator or the user closes it; any other session only reports it.
