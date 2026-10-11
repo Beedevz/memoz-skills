@@ -91,7 +91,7 @@ verbatim). If the write fails, put the full report in your last message instead.
 
 ```
 ### Implementer report — <piece> · <date> · <model>
-**Branch / commit:** <branch> · <short hash>
+**Branch / commit:** <branch> · <short hash> | none (stopped on drift)
 **Drift:** <none | what the reality check (task-flow §3) found — (stopped)>
 **What changed:** <numbers — measured, not estimated>
 **Files touched:** <count> · outside `files`: <none | list>

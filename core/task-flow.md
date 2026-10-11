@@ -190,7 +190,8 @@ which session works from it: a second session on the same task looks exactly lik
 Continuing from a checkout other than the record's (compare resolved paths, §2a) → ask the user;
 the record's `branch` and `worktree` stay as they are. Before working in that checkout on the
 user's approval, show any `doing` task whose `worktree` is that checkout and ask — one `doing` per
-worktree.
+worktree. A record with an empty `worktree` works in the main checkout: compare it as
+the main checkout's resolved path.
 
 If you notice work missing elsewhere, **record it as a task** where the declaration says work is
 tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no

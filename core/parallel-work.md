@@ -42,6 +42,7 @@ request opened · a merge.
 
 ## 1. Before anything starts
 
+- [ ] **Resuming a piece in a new session:** stop and ask the human how to continue — before any other step here.
 - [ ] **Settle which knowledge-layer server serves the project's declared vault** (`.memoz/tasks.json` → `vault`). A server reports the vault it serves when it connects (see the task-flow skill). With several vaults connected, each under its own name, a name alone does not tell you — so, in this order:
   1. the server whose reported vault **matches** → use it;
   2. none matches, and **exactly one** server reports no vault → use it, and say so;
@@ -51,7 +52,6 @@ request opened · a merge.
 - [ ] Write a task note per piece, still `status: todo`: scope, contracts, *Not Doing* and `files`.
 - [ ] Intersect the pieces written in this batch with each other. List the other `doing` and `review` tasks, and intersect the `files` of those that carry them with each piece's, and with the project's **hot files** (`hotFiles` in `.memoz/tasks.json` — shared files and how each is resolved). A task without `files` (single-session work) cannot be intersected — list it for the human instead of claiming no overlap.
 - [ ] ⚠️ **An empty `doing` list does not mean nobody is on it.** Work started outside this protocol has no task note, so the step above cannot see it. Also look for open merge/pull requests and remote branches touching the same files (`git fetch --prune`, then the forge's list of open requests). Show the human everything found — your own pieces' branches and requests included — and let them decide (the task-flow skill's §4). Do the listing every time: a request can stay open for hours without touching the task notes, and one listing is enough to show it.
-- [ ] **Resuming a piece in a new session:** stop and ask the human how to continue.
 - [ ] ⛔ **If they intersect, do not start in parallel — ask the human.** Show, for each shared file: which pieces touch it, whether it is a hot file and how it resolves, the proposed merge order, and what running them one after another would cost. Run in parallel only on approval; otherwise run them in sequence. Proceed without approval only when the checks above found nothing at all (just say so); anything found, the human decides.
   ⚠️ "It is a hot file, it regenerates" does **not** replace approval. That a resolution exists does not mean the collision was accepted — and the first resolution proposed for a hot file can be wrong. *Observed in the pilot.*
 - [ ] Only then, per piece: create the worktree from the up-to-date base branch, and in one write set its note to `status: doing`, `stage: implementing`, `branch`, `worktree`. Install dependencies there (a fresh worktree has none).
@@ -69,6 +69,7 @@ request opened · a merge.
 ## 3. When results come back — verify, do not forward
 
 - [ ] **Where is the implementer's report?** If it could not reach the note, its last message carries the full report — record it through the server you settled on. If it stopped because that server reports a *different* vault than the declared one, your settling was wrong: settle again (§1) before recording anything.
+- [ ] **Did it stop on drift?** If the report's **Drift** line ends in *(stopped)*, take the drift to the human and do not move the piece to agent review until they decide.
 - [ ] **Is the tree actually clean?** ⚠️ An empty result is not a clean result: `git status | wc -l` printing `0` also happens when the command errored. Take the exit code, or look for something that is always there (a known positive) in the same query. An implementer can report "done" with its last edit never committed, and this check is what shows it. *Observed in the pilot.*
 - [ ] **Does the diff stay inside `files`?** Anything outside is either a scope change the human should hear about, or a mistake.
 - [ ] **Re-measure the key claims yourself** — counts, "zero left", "tests unchanged". Compare test *counts* before and after, not just pass/fail: a renamed test file that stops being discovered still leaves the suite green.
