@@ -96,7 +96,8 @@ Both are valid — read which one this project uses; do not impose a shape.
 Every task note in progress carries `branch` and `worktree` as information — the check in §4
 shows them to the user. A piece of parallel work also carries `files` (the paths it claims). The rule is **one
 `doing` per worktree** — two active tasks in one working directory cannot be told apart. Under
-parallel work only the orchestrator writes these fields, `status` and `stage`. See *parallel work*.
+parallel work only the orchestrator writes these fields, `status`, `stage` and the checkpoints; a
+session resuming a piece asks first whether it is the orchestrator (*parallel work* §1).
 
 ## 2b. Repo backend
 
@@ -189,12 +190,9 @@ requests for the user instead of reporting no overlap.
 
 **Nothing passes without being shown.** Show the user everything found — the task's own branch
 and open request included, and every overlap — and let the user decide. A record does not say
-which session works from it: a second session on the same task looks exactly like this one. When
-the user approves continuing from a checkout other than the record's (compare resolved paths,
-§2a), update `branch` and `worktree` in the record — `worktree` is the resolved absolute path of
-the linked worktree, or empty in the main checkout. Under parallel work the orchestrator writes
-them; otherwise the continuing session does. Before moving `worktree`, keep one `doing` per
-worktree: if another `doing` task already names that worktree, show it and ask.
+which session works from it: a second session on the same task looks exactly like this one.
+Continuing from a checkout other than the record's (compare resolved paths, §2a) → ask the user;
+the record's `branch` and `worktree` stay as they are.
 
 If you notice work missing elsewhere, **record it as a task** where the declaration says work is
 tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no
