@@ -67,8 +67,8 @@ to the wrong server answers correctly, about the wrong vault.
 
 - `list_tasks(status: "doing")` → the active task — exactly one per working directory. Several
   are normal when work runs in parallel, each in its own worktree.
-- `list_tasks(status: "review")` → waiting for the human. One that is yours (§7) and has merged:
-  offer to close it before new work. List any other for the user.
+- `list_tasks(status: "review")` → waiting for the human. List them for the user; for one that
+  has merged, offer to close it (§7) before new work.
 - `list_tasks(status: "todo")` → what is queued.
 
 - **One `doing`** → that is the focus. Read the note; scope and *Not Doing* live there.
@@ -81,8 +81,7 @@ to the wrong server answers correctly, about the wrong vault.
 - Check that the chosen task is not under way elsewhere (§4). **Starting** it (`todo` → `doing`):
   then, in one write, set `status: doing`, `stage: implementing`, `branch`, and `worktree` — the
   resolved absolute path of the linked worktree you work in, or empty in the main checkout.
-  **Resuming** a `doing` task: leave `stage`, `branch` and `worktree` as they are; if the current
-  checkout is not the record's `worktree`, ask the user before working on it.
+  **Resuming** a `doing` task: the check in §4 runs too; leave `stage` as it is.
 
 ⚠️ In this backend "active" is a **field**, not a filename. Searching for `*-active.md` is
 meaningless here.
@@ -90,8 +89,8 @@ meaningless here.
 ⚠️ Sub-tasks may be separate notes (`<prefix>-NN/T<k> — …`) or sections inside the parent note.
 Both are valid — read which one this project uses; do not impose a shape.
 
-Every task note in progress carries `branch` and `worktree`; who owns the task is read from them
-(§4, §7). A piece of parallel work also carries `files` (the paths it claims). The rule is **one
+Every task note in progress carries `branch` and `worktree` as information — the check in §4
+shows them to the user. A piece of parallel work also carries `files` (the paths it claims). The rule is **one
 `doing` per worktree** — two active tasks in one working directory cannot be told apart. Under
 parallel work only the orchestrator writes these fields, `status` and `stage`. See *parallel work*.
 
@@ -184,15 +183,11 @@ forge's list of open requests). Records that carry `files` are intersected with 
 task touches; a record without `files` (single-session work) cannot be, so list it and the open
 requests for the user instead of reporting no overlap.
 
-Anything found → stop and ask the user, with two exceptions that pass silently:
-
-- the task's own branch and request (the record's `branch`), **only when the current checkout is
-  the record's `worktree`** — compare resolved paths (§2a);
-- for an orchestrator, the records of the pieces it started in this session, with their branches
-  and requests — it owns them (*parallel work*).
-
-With an empty `worktree` (work in the main checkout), show the own branch and request to the user
-too: from there, a second session on the same task looks exactly like this one.
+**Nothing passes without being shown.** Show the user everything found — the task's own branch
+and open request included, and every overlap — and let the user decide. A record does not say
+which session works from it: a second session on the same task looks exactly like this one. When
+the user approves continuing from a checkout other than the record's, update `branch` and
+`worktree` in the record.
 
 If you notice work missing elsewhere, **record it as a task** where the declaration says work is
 tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no
@@ -237,7 +232,4 @@ If you cannot find them, **ask**.
 - Never commit without showing the message first.
 - Once the user agrees: write the closure (the closure skill says where it goes), then set the
   closed status the user chose — in that order.
-- **A task in `review` is closed only by its owner:** the session whose current checkout is the
-  record's `worktree` (resolved paths), or the orchestrator of that piece. Any other session lists
-  it and tells the user. When the `worktree` is empty or no longer exists, or the task had no
-  orchestrator (single-session work), ask the user; on their word, this session may close it.
+- **A task in `review` may be closed from any session — only after asking the user.**
