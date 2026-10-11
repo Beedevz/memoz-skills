@@ -36,7 +36,7 @@ means pieces that touch it do not run in parallel without the user's approval. S
 
 ⚠️ **Why a declaration and not detection.** An MCP server is reachable from every directory, so
 detecting the backend from what is reachable would, in an unrelated project, silently adopt
-**another project's** tasks — and the "neither is present, so ask" branch could never fire.
+**another project's** tasks.
 Reachability is a *capability*; ownership is a *declaration*.
 
 ⚠️ **Never hardcode a prefix.** `ABC-` is wrong in a project that uses `XYZ-1`. Read it every time.
