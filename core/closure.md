@@ -48,16 +48,31 @@ finish it.
 ⚠️ "It works on my machine but I could not test it properly" is a reason. "I ran out of time" is
 a reason. Both are worth writing. Silence is not.
 
-## Two levels, two places
+## Where the record goes
 
-| closing | where the record goes |
+**Ask the falsified-assumptions question first** — its answer decides the place. Then take the
+first row that matches and write the record there, once:
+
+| the work being closed… | where the record goes |
 |---|---|
-| **A sub-task** | inside its own record — the lesson is small and concerns only that work |
-| **A parent task** | a separate record in the knowledge layer, linked from the task |
+| produced a measurement, a decision with rejected options, or a falsified assumption | a separate record in the knowledge layer, linked from the record of the work |
+| is a parent task | a separate record in the knowledge layer, linked from the task |
+| anything else — a sub-task, a small task | a *Closed* section inside its own record |
 
-The second is read by *other* work; it belongs where reasons live, not buried in a checklist.
+A separate record is read by *other* work; it belongs where reasons live, not buried in a
+checklist. A *Closed* section is short, not partial: it still answers every field — "none" is an
+answer.
 
-Which layout a project uses is something to read from the project, not impose.
+Write it once. Do not start small and move it later, and do not keep a copy in both places:
+copies drift apart.
+
+The knowledge layer is the project's vault; with no vault, both forms go in the task file itself.
+Read the declaration (`.memoz/tasks.json`) for where it is, and which layout the project uses; if
+the declaration is missing, ask rather than choosing.
+
+⚠️ Write the record **before** the work moves to its closed status. Once the status changes, the
+pressure to write it is gone and the detail goes with it. The closed status is the vault's own
+(`done`, `dropped`, …), and closing is the user's call.
 
 ## Do not write it for the user
 
@@ -65,12 +80,3 @@ Ask the questions. Offer what you observed — commands you ran, numbers you mea
 and what you changed. But the assumptions that were falsified are the user's to state; inventing
 them produces a confident record of something nobody actually learned, which is worse than a
 short one.
-
-## Where it goes
-
-The record belongs in the project's knowledge layer, next to the work it explains — a note in a
-vault, or the task file itself when there is no vault. Read the project's declaration
-(`.memoz/tasks.json`) for where that is; if it is missing, ask rather than choosing.
-
-⚠️ Write the record **before** marking the work done. Once the status changes, the pressure to
-write it is gone and the detail goes with it.

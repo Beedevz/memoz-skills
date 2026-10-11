@@ -4,7 +4,7 @@
       "id": "memoz-task-flow",
       "core": "core/task-flow.md",
       "title": "Memoz task flow",
-      "description": "Find the active task from the project's .memoz/tasks.json declaration and work on exactly one. Use when starting, continuing or closing work in a project tracked with Memoz. Never guesses where work lives."
+      "description": "Entry point for work in a project tracked with Memoz: find the active task from the project's .memoz/tasks.json declaration, work on exactly one, checkpoint its record after every step, close it, and route several pieces at once to parallel work. Use when starting, continuing or closing work. Never guesses where work lives."
     },
     {
       "id": "memoz-closure",

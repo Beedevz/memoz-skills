@@ -19,7 +19,8 @@ rejected, for a reason nobody wrote down.
 |---|---|
 | **Decision** | one sentence, in the present tense: what is true from now on |
 | **Rejected options** | each with the ground it was rejected on — **not "we preferred X"** |
-| **Known limits** | what this decision makes harder, or does not solve |
+| **Known limits** | what this decision makes harder, or does not solve — the chosen option's cost |
+| **Open questions** | what is still undecided, and who decides it — "none" is an answer |
 | **What would reopen it** | the observation that should make someone revisit this |
 
 ## Rejected options are the body of the record

@@ -65,11 +65,13 @@ and the record of it:
 
 - **the decision**, in one sentence
 - **the options rejected**, each with the ground it was rejected on
-- **the open questions** that were not resolved — written down rather than dropped
+- **the known limits** — the cost you named for the chosen option (§3)
+- **the open questions** that were not resolved, and who decides them — written down rather than
+  dropped
 - **what would reopen it**
 
-Hand the last four to the decision-record skill; do not invent a second format for the same
-thing.
+These are the decision-record skill's fields; record them there, one for one. Do not invent a
+second format for the same thing.
 
 ⚠️ Open questions are the part most often lost. A question that surfaced during a discussion and
 was never answered does not disappear — it comes back as a surprise during implementation. Write

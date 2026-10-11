@@ -102,7 +102,7 @@ project can make it.
 
 | skill | what it enforces |
 |---|---|
-| `memoz-task-flow` | Find the active task from the declaration; never invent task files |
+| `memoz-task-flow` | The entry point: find the active task from the declaration, checkpoint its record after every step, close it; several pieces at once go to parallel work. Never invent task files |
 | `memoz-closure` | Record what was learned before the context is gone — including what was **falsified** |
 | `memoz-pattern-log` | Count the mistakes that repeat — one place, one count, recognisable early |
 | `memoz-mutation` | Prove a test locks something: break it on purpose. *Not applied* is not a pass |

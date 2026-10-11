@@ -59,12 +59,13 @@ The ladder, for when the user does ask:
   mutated is an automated reminder — L1, not L2. A regression test pinning one incident is a lock
   on that incident, not on the shape.
 - **Measure the gate before you trust it.** A gate that enumerates what it inspects — node kinds,
-  file types, fields — sees only what is on its list. In practice a counting gate turned out to be
-  blind to sixteen declaration kinds, discovered a few at a time; its first completeness test was
-  itself a list of one field. Write down, in the gate, what it does **not** see.
-- **Measure the rule before you write it.** A proposed L1 step that said "run the shadow analyser"
-  would have been blind: measured, the analyser stayed silent on exactly the kind of case that
-  prompted it. A blind rule is worse than none — it reassures without protecting.
+  file types, fields — sees only what is on its list, and its gaps surface a few at a time, after
+  it is already trusted; a completeness test written as a list has the same blind spot. Write
+  down, in the gate, what it does **not** see. *Observed in the pilot.*
+- **Measure the rule before you write it.** A step that names a tool ("run the analyser") is only
+  as good as that tool on the case that prompted it, and the tool can be silent on exactly that
+  case. A blind rule is worse than none — it reassures without protecting.
+  *Observed in the pilot.*
 - Record a promotion in the entry: `Level: Lx — <where>`, with why this level and why not higher.
   A project may declare an automatic threshold of its own; by default there is none.
 
