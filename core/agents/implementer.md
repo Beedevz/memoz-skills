@@ -46,7 +46,8 @@ you which vault is behind it. Check before you start, not after the work:
     gate green. Clean merges and the regenerate step after them are the orchestrator's.
 - **Dependencies:** a new worktree has none. Install them with the lockfile frozen, and never commit
   the lockfile as a side effect.
-- **Do not:** push · merge · run the task-flow skill's checkpoints · edit the task note's
+- **Do not:** push · merge · run the task-flow skill — its concurrent-work check (§4) ends in a
+  decision by the user, whom you cannot reach; the orchestrator runs the checks and every checkpoint · edit the task note's
   frontmatter (`status` · `stage` · `branch` · `worktree` · `files` — the orchestrator owns those
   and writes every checkpoint; rewriting a note is not surgical) · print secret values. The only
   thing you write into the task note is your report.

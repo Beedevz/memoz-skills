@@ -193,8 +193,11 @@ requests for the user instead of reporting no overlap.
 **Nothing passes without being shown.** Show the user everything found — the task's own branch
 and open request included, and every overlap — and let the user decide. A record does not say
 which session works from it: a second session on the same task looks exactly like this one. When
-the user approves continuing from a checkout other than the record's, update `branch` and
-`worktree` in the record.
+the user approves continuing from a checkout other than the record's (compare resolved paths,
+§2a), update `branch` and `worktree` in the record — `worktree` is the resolved absolute path of
+the linked worktree, or empty in the main checkout. Under parallel work the orchestrator writes
+them; otherwise the continuing session does. Before moving `worktree`, keep one `doing` per
+worktree: if another `doing` task already names that worktree, show it and ask.
 
 If you notice work missing elsewhere, **record it as a task** where the declaration says work is
 tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no
