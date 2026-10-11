@@ -64,13 +64,10 @@ repository — the other end of a contract is often outside the diff.
 Your report is your **last message**, not a note. The orchestrator reproduces each finding, then
 records the report in the task note.
 
-⚠️ Why not write the note yourself: an agent's tool list names a knowledge-layer server by its
-registered name. With several vaults, each served under its own name, that name belongs to one
-vault only. In one real setup, the vault behind the name that used to be fixed in this role was
-not the declared vault of most projects that declared one. Run in such a project, the write would
-most likely fail — the task note is not in that vault — and the report would be lost; if a note
-happened to exist at the same path, it would land in the wrong vault. Which server serves the
-project is settled once, by the orchestrator; a fixed tool list cannot follow it.
+Why not write the note yourself: a tool list names a knowledge-layer server by its registered
+name, and with several vaults connected that name follows one vault, not the project. A write
+through it can fail and lose the report, or land in the wrong vault. The orchestrator settles
+which server serves the project, so it records the report.
 
 ```
 ### Reviewer report — <branch> · <base>…<head> · <date> · <model>
