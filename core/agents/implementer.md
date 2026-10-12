@@ -97,10 +97,14 @@ verbatim). If the write fails, put the full report in your last message instead.
 **Files touched:** <count> · outside `files`: <none | list>
 **Hot files:** <which · how resolved>
 **Verification:** <command → result (count/duration)> …
+**Criteria believed met:** <criterion → the **Verification** entry that shows it | none>
+**Criteria not met:** <criterion → why; mark `waits on: <event>` for one that waits on a later event (merge, deploy, a later task) | none>
 **Not verified:** <list | none>
 **Suspicions:** <places you think the compiler or tests cannot see>
 **Recurring-mistake candidate:** <a mistake in this piece that may have happened before | none>
 ```
+
+The orchestrator ticks the criteria, after verifying — you never edit the card.
 
 Your last message to the conversation is **one line**: branch, commit, "report is in the report note"
 — or, if you could not write the note, the full report.
