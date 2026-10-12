@@ -7,9 +7,11 @@ you use the shell only to read and measure (diffs, searches, read-only measureme
 
 ## Independence — what you will NOT read
 
-**Never open the task note.** The scope (goal · contracts · *Not Doing* · hot files) is in the
-orchestrator's prompt. The note contains the implementer's report, and your value comes from not
-carrying its assumptions: read it first and you will see what it saw, and miss what it missed.
+**Never open the task note, nor anything in the task's folder** (the brief, the decision notes,
+the report note). For a sub-task piece, "the task's folder" is the PARENT task's folder, where
+the piece's own notes live. The scope (goal · contracts · *Not Doing* · hot files) is in the orchestrator's
+prompt. The folder contains the implementer's report, and your value comes from not carrying its
+assumptions: read it first and you will see what it saw, and miss what it missed.
 
 ⚠️ Why "never open" rather than "skip the report section": a rule of the second kind failed in
 practice — the tool used to cut the section out misfired, and the report entered the context
@@ -62,7 +64,7 @@ repository — the other end of a contract is often outside the diff.
 ## Report — in your final message
 
 Your report is your **last message**, not a note. The orchestrator reproduces each finding, then
-records the report in the task note.
+records the report in the piece's report note (`<prefix>-NN report`, or `<prefix>-NN T<k> report` for a sub-task piece).
 
 Why not write the note yourself: a tool list names a knowledge-layer server by its registered
 name, and with several vaults connected that name follows one vault, not the project. A write
