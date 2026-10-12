@@ -57,7 +57,7 @@ row that matches and write the record there, once:
 |---|---|
 | produced a measurement, a decision with rejected options, or a falsified assumption | a separate record in the knowledge layer, linked from the record of the work |
 | is a parent task | a separate record in the knowledge layer, linked from the task |
-| anything else — a sub-task, a small task | a *Closed* section inside its own record |
+| anything else — a sub-task, a small task | a *Closed* section in the task's report note (`<prefix>-NN report`, in the task's folder; a sub-task note's: its own `<prefix>-NN T<k> report`, in the parent's folder) — with no vault, inside its own record; a task with no folder or report note yet (a one-line fix) gets them created for it: read first, never overwrite |
 
 A separate record is read by *other* work; it belongs where reasons live, not buried in a
 checklist. A *Closed* section is short, not partial: it still answers every field — "none" is an
@@ -73,6 +73,23 @@ the declaration is missing, ask rather than choosing.
 ⚠️ Write the record **before** the work moves to its closed status. Once the status changes, the
 pressure to write it is gone and the detail goes with it. The closed status is the vault's own
 (`done`, `dropped`, …), and closing is the user's call.
+
+## Link what the task already wrote
+
+A task kept as a card has its reasoning in notes of its own folder: the **brief**, the **task
+decisions** and the **report** note (`<prefix>-NN brief`, `<prefix>-NN D<n> — …` (a sub-task's: `<prefix>-NN T<k> D<n> — …`),
+`<prefix>-NN report`). Do not copy them into the closure — a copy
+drifts from the note it copies.
+
+- The closure's *Decisions and why* field links each task decision (and the project decision it
+  was also written to, if any) and adds only what they lack: the options rejected that never got a
+  note of their own.
+- Where the closure is its own record, it links the brief and the decisions; where it is a *Closed*
+  section, it sits in the report note, which already sits beside them and links them. Either way
+  the card's links point at the closure (or the report note), so the way from the card to every
+  record of the task is one hop.
+- A task with no brief and no task decisions has nothing to link: write "none" in the field, as
+  with any other.
 
 ## Do not write it for the user
 

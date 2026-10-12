@@ -1,6 +1,6 @@
 ---
 name: memoz-decision
-description: "Record a decision together with the options rejected and the ground each was rejected on, plus what observation would reopen it. Use when a choice is made that outlives the task."
+description: "Record a decision together with the options rejected and the ground each was rejected on, plus what observation would reopen it. Use when a choice is made that outlives the task, or a choice inside a task worth keeping beside it."
 ---
 
 <!-- GENERATED from core/decision.md — do not edit. Run: node scripts/render.mjs -->
@@ -45,13 +45,34 @@ above X"*. A threshold nobody can evaluate is a decoration.
 ⚠️ Where the count is kept matters. Keep it with the decision. A count copied elsewhere goes stale
 and then argues, silently, for doing nothing.
 
+## Task decision or project decision
+
+Ask who will need the decision after this task is closed.
+
+| the decision… | goes to |
+|---|---|
+| matters only to this task — a choice inside its scope | a **task decision**: its own note in the task's folder, `<prefix>-NN/<prefix>-NN D<n> — <title>` (`D1`, `D2`, … counted inside the task; a sub-task piece's: `<prefix>-NN T<k> D<n> — <title>`, in the parent's folder, so numbering cannot collide), linked from the card |
+| changes how the project works, or will be read by other work | the project's decisions place (below), **and** a task decision in the task's folder |
+
+The two kinds are linked **both ways**: the project record names the task that produced it, and the
+task decision links the project record. Write the full record (every field above) once, in the
+project's decisions place, and keep the task decision to its one-sentence *Decision* and the link —
+the copy that is kept in full is the one that stays true. Not sure which kind it is? Treat it as a
+project decision: a task decision that turns out to matter has to be found again, a project
+decision filed under a task cannot be.
+
+A task decision carries no `status` (it is not a task), and no number outside its task — numbering
+is per task (per sub-task piece, for a sub-task), so there is no "next free number" to track.
+
 ## Do not merge it into the work record
 
 A decision outlives the task that produced it and is read by work that has nothing to do with
 that task. It belongs in the knowledge layer, linked from the task — not buried in a checklist
-that will be marked done and never opened again.
+that will be marked done and never opened again. A task decision written as its own note in the task's
+folder is not buried: the card links it, and the card stays short.
 
 ## Where it goes
 
 The project's knowledge layer. Read the declaration (`.memoz/tasks.json`) for where that is; ask
-if it is missing rather than choosing a location.
+if it is missing rather than choosing a location. A task decision (above) goes in the task's own
+folder inside it.

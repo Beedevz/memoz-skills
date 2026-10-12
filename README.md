@@ -89,6 +89,7 @@ Every project that uses these skills carries one small file:
 | `vault` | which vault (`backend: vault`) | **ask** |
 | `folder` | scope inside the vault | vault root |
 | `taskDir` | task directory (`backend: repo`) | `docs/tasks` |
+| `milestones` | the path inside the vault that holds the milestone notes (`Milestones`, `Proj/Milestones`) — optional; not derived from `folder` | **ask**, when a milestone is needed |
 | `hotFiles` | files parallel work tends to share, and how a collision resolves (`regenerate` + `command`, or `serialize`) | nothing treated as shared |
 
 **If the file is missing, the skills stop and ask.** They never guess.
@@ -124,8 +125,8 @@ conversation, not a record.
 
 | agent | does | never does |
 |---|---|---|
-| `memoz-implementer` | one piece, in its own worktree; report into the task note | push · merge · change task status · write checkpoints |
-| `memoz-reviewer` | an independent, adversarial read of the diff — contracts the compiler cannot see; returns its report as its last message | change code · open the task note |
+| `memoz-implementer` | one piece, in its own worktree; report into the task's report note | push · merge · change task status · write checkpoints |
+| `memoz-reviewer` | an independent, adversarial read of the diff — contracts the compiler cannot see; returns its report as its last message | change code · open the task note or its folder |
 
 Hosts without sub-agents get the same role text as flat prompts under `hosts/codex/`.
 

@@ -28,7 +28,7 @@
       "id": "memoz-decision",
       "core": "core/decision.md",
       "title": "Memoz decision record",
-      "description": "Record a decision together with the options rejected and the ground each was rejected on, plus what observation would reopen it. Use when a choice is made that outlives the task."
+      "description": "Record a decision together with the options rejected and the ground each was rejected on, plus what observation would reopen it. Use when a choice is made that outlives the task, or a choice inside a task worth keeping beside it."
     },
     {
       "id": "memoz-measurement",
@@ -70,7 +70,7 @@
       "id": "memoz-parallel-work",
       "core": "core/parallel-work.md",
       "title": "Memoz parallel work",
-      "description": "Orchestrate several pieces of work at once: one worktree, branch and task note per piece; check file overlap and ask before running overlapping work in parallel; start implementer and independent reviewer agents; re-verify every claim yourself; merge shared hot files in order and always regenerate them. Use when splitting work across agents or worktrees."
+      "description": "Orchestrate several pieces of work at once: one worktree, branch and task note per piece (a card, with its brief and report note in the task's folder); check file overlap and ask before running overlapping work in parallel; start implementer and independent reviewer agents; re-verify every claim yourself; merge shared hot files in order and always regenerate them. Use when splitting work across agents or worktrees."
     }
   ],
   "agents": [
@@ -78,7 +78,7 @@
       "id": "memoz-implementer",
       "core": "core/agents/implementer.md",
       "title": "Memoz implementer",
-      "description": "Implements one piece of work in its own worktree and writes its report into the task note. Use when an orchestrator hands off a single piece; the task note, branch and owned files are given in the prompt. Does not push, merge, change task status or write checkpoints.",
+      "description": "Implements one piece of work in its own worktree and appends its report to the task's report note. Use when an orchestrator hands off a single piece; the task card, brief, report note, branch and owned files are given in the prompt. Does not push, merge, change task status or write checkpoints.",
       "model": "sonnet",
       "color": "blue"
     },
@@ -86,7 +86,7 @@
       "id": "memoz-reviewer",
       "core": "core/agents/reviewer.md",
       "title": "Memoz reviewer",
-      "description": "Reviews one branch's diff independently and adversarially, asking what contract the change breaks that the compiler and tests cannot see. Use after an implementer finishes and before the orchestrator asks a human to approve. Does not change code; never opens the task note; returns its report as its last message for the orchestrator to record.",
+      "description": "Reviews one branch's diff independently and adversarially, asking what contract the change breaks that the compiler and tests cannot see. Use after an implementer finishes and before the orchestrator asks a human to approve. Does not change code; never opens the task note or its folder; returns its report as its last message for the orchestrator to record.",
       "model": "opus",
       "color": "red",
       "tools": "Read, Grep, Glob, Bash"

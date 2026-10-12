@@ -13,7 +13,7 @@ at once to *parallel work*.
 
 | phase | what happens | where |
 |---|---|---|
-| **Start** | read the declaration · pick one task · check it is not under way elsewhere · mark it `doing` with its `branch` and `worktree` | §1–§4 |
+| **Start** | read the declaration · pick one task · check it is not under way elsewhere · mark it `doing` with its `start`, `branch` and `worktree` | §1–§4 |
 | **Work** | a checkpoint in the task record after every finished step | §5 |
 | **Finish** | criteria ticked or `[~]` · the closure · the closed status, on the user's word | §7, then the closure skill |
 
@@ -24,8 +24,11 @@ at once to *parallel work*.
 - `stage`, while `doing`: `implementing` → `agent-review` (only when a reviewer agent runs) →
   `verified` (the verification passed). A merge is a checkpoint line, not a stage.
 
+The shape of the record — the short card, the task's folder, and the `milestone` · `start` ·
+`done` · `mr` fields — is §2d.
+
 The repo backend (§2b) is outside the lifecycle: there a checkpoint is a ticked checkbox plus a
-dated line in the task file. Do not invent frontmatter for it.
+dated line in the task file (there is no card or `## Log` section there). Do not invent frontmatter for it.
 
 **Several pieces at once** — the user asks for more than one, or more than one ready task should
 run together → *parallel work*. The lifecycle is the same per piece: each has its own task
@@ -44,6 +47,7 @@ cat .memoz/tasks.json 2>/dev/null
 | `vault` | which vault (`backend: vault`) | **ask** |
 | `folder` | scope inside the vault | vault root |
 | `taskDir` | task directory (`backend: repo`) | `docs/tasks` |
+| `milestones` | the path inside the vault that holds the milestone notes (`Milestones`, `Proj/Milestones`) — optional; not derived from `folder` | **ask**, when a milestone is needed |
 | `hotFiles` | files that parallel pieces of work tend to share, each with how a collision resolves: `regenerate` (+ `command`) or `serialize` | none — no file is treated as shared |
 
 A `hotFiles` entry, for example: `{ "path": "docs/index.md", "resolve": "regenerate", "command": "npm run gen:index" }`.
@@ -75,7 +79,7 @@ to the wrong server answers correctly, about the wrong vault.
   has merged, offer to close it — or report it, if §7 says so — before new work.
 - `list_tasks(status: "todo")` → what is queued.
 
-- **One `doing`** → that is the focus. Read the note; scope and *Not Doing* live there.
+- **One `doing`** → that is the focus. Read the card and its brief (§2d): the criteria and *Not Doing* are on the card, the scope is in the brief.
 - **More than one `doing`** → if the notes carry a `worktree` field, the focus is the one whose
   `worktree` is the current checkout (`git rev-parse --show-toplevel`). Compare **resolved** paths,
   not strings — a path through a symlink (`/tmp` → `/private/tmp` on macOS) names the same
@@ -84,11 +88,13 @@ to the wrong server answers correctly, about the wrong vault.
   choose.
 - **No `doing`** → show the `todo` list by priority and **ask**. Do not start on your own.
 - Check that the chosen task is not under way elsewhere (§4). **Starting** it (`todo` → `doing`):
-  then, in one write, set `status: doing`, `stage: implementing`, `branch`, and `worktree` — the
-  resolved absolute path of the linked worktree you work in, or empty in the main checkout.
+  then, in one write, set `status: doing`, `stage: implementing`, `start` (§2d, the stamp rule),
+  `branch`, and `worktree` — the resolved absolute path of the linked worktree you work in, or
+  empty in the main checkout. If the tool that sets `status` does not stamp `start`, do not use it
+  for this move: make it one hand edit of all these fields (§2d).
   **Resuming** a `doing` task: if it is a piece of parallel work and this is a new session, stop
-  and ask the user how to continue first — before §4; otherwise the check in §4 runs too. Leave
-  `stage` as it is.
+  and ask the user how to continue first — before §4; otherwise the check in §4 runs too. It is
+  not a move: leave `stage` and `start` as they are.
 
 ⚠️ In this backend "active" is a **field**, not a filename. Searching for `*-active.md` is
 meaningless here.
@@ -99,7 +105,8 @@ Both are valid — read which one this project uses; do not impose a shape.
 Every task note in progress carries `branch` and `worktree` as information — the check in §4
 shows them to the user. A piece of parallel work also carries `files` (the paths it claims). The rule is **one
 `doing` per worktree** — two active tasks in one working directory cannot be told apart. Under
-parallel work only the orchestrator writes these fields, `status`, `stage` and the checkpoints; a
+parallel work only the orchestrator writes these fields, `status`, `stage`, `start`, `done`, `milestone`, `mr` and the
+checkpoints; a
 session resuming a piece stops and asks the user how to continue — before any other step, §4
 included.
 
@@ -167,6 +174,86 @@ only defence is checking before you conclude.
 was a *different* vault, and the tooling reported "no work to do" while the tasks were plainly
 visible in the app.
 
+## 2d. The task card, its folder and its fields (vault backend)
+
+A task note is a **card**: short enough to take in at a glance, because the task list, a status
+band and the next session all read it. Its layout, in this order:
+
+1. **Frontmatter** — the fields below.
+2. **Goal** — one line.
+3. **Links** — wikilinks to the task's brief, its decisions and its report (and the closure, once
+   written, if that is a separate record). The link to the report note is added when that note
+   first appears: by whoever creates it, or, under parallel work, by the orchestrator when it
+   first records into it (an implementer does not edit the card).
+4. **Completion criteria** — the checkboxes (§7).
+5. **Not Doing** — the hard fence (§4).
+6. **Log** — a level-2 heading `## Log`, holding one dated line per checkpoint
+   (`YYYY-MM-DD — …`, §5), newest last. One line each, not a paragraph. Keep the heading exactly
+   `## Log`: tooling reads the last dated line under a heading that starts with `Log` to tell
+   whether a task has stalled, and a dated line anywhere else is not seen.
+
+Why the task exists, its scope and what it changes do not fit in a goal line: they go to a
+**brief**. Choices made while working the task go to **task decisions**; what the work reports
+back goes to a **report** note. All of them live in the task's own folder — a folder named after
+the task id, next to the card (where sub-task notes `<prefix>-NN/T<k> — …` live, if the project
+uses them):
+
+| note | name | holds |
+|---|---|---|
+| brief | `<prefix>-NN/<prefix>-NN brief` (a sub-task note with a scope of its own: `<prefix>-NN T<k> brief`; without one, the parent's brief is its brief) | why · scope · what changes |
+| task decision | `<prefix>-NN/<prefix>-NN D<n> — <title>` (`D1`, `D2`, … counted inside this task); a sub-task piece's: `<prefix>-NN T<k> D<n> — <title>`, in the parent's folder, so numbers never collide | one decision, with the fields of the decision skill; one that also affects the project keeps only its one-sentence *Decision* and a link to the project record (decision skill) |
+| report | `<prefix>-NN/<prefix>-NN report` (a sub-task note: `<prefix>-NN T<k> report`, in the parent's folder — never the parent's report note, so two pieces never append to one note) | what comes back from the work, appended in order: implementer reports, reviewer reports (verbatim), and the closure when it is a *Closed* section (closure skill) |
+
+**A brief is required for every task that has a scope.** Only a one-line fix is exempt — a task
+whose whole scope fits in the goal line. The report note is created by whoever writes the first
+report (after looking for it — never overwriting an existing one); a task with none yet has none.
+
+A card that grows past a screen is a sign that a brief, a decision or a report is hiding in it:
+move it out and leave a link. These notes carry **no `status`** — a note with a `status` in a
+task's folder is a sub-task, and task lists count it as one. A decision that affects the whole
+project is also recorded in the project's decisions place, the two linking each other (the
+decision skill says how).
+
+Fields. `status`, `stage`, `branch`, `worktree` and `files` are §2a; the dates, the milestone and
+the merge request are these:
+
+| field | meaning | who writes it, when |
+|---|---|---|
+| `milestone` | the milestone this task belongs to: its **id**, never a path. The id is a string: quote one that looks like a number (`milestone: "1.10"`, not `1.10`; a reader strips one matching pair of quotes). Write the id itself, never a link (`[[…]]`) | whoever creates the task (the planning skill); a task without one belongs to no milestone |
+| `start` | the day work began (`YYYY-MM-DD`) | the stamp rule below: on a move to `doing`, in the same write as `status` (§2a) |
+| `done` | the day work ended (`YYYY-MM-DD`) — the **only** end date | stamped on the move to the closed status (§7), in the same write |
+| `due` | the optional **planned** date (`YYYY-MM-DD`) | the user; never invented |
+| `mr` | the URL of the merge / pull request carrying the work; when there are several, an inline list: `mr: [url1, url2]` | the checkpoint in which the request was opened (§5) |
+
+In a **task**, `start` is the day work *actually* began. In a **milestone** note the same-named
+`start` and `due` are the *plan* (the planning skill).
+
+**The stamp rule.** On a move to `doing`, write `start` (today) if it is empty; never overwrite a
+`start` that is set; never write it without a move — a task already `doing` stays as it is, and a
+`doing` task whose `start` is empty is not backfilled. On the move to the closed status, write
+`done` in the same write. On a move from a closed status back to an open one, remove `done`, so
+a later re-close stamps the new date instead of keeping the first.
+
+⚠️ Whether a status tool stamps `start` and `done` depends on the tool. One that does not (an
+editor, a note written by hand — an agent editing the file is exactly that) leaves them empty, and
+a field the writer skipped is not "unknown", it is a hole in every list that reads it. So: **a
+tool that does not stamp is not used for the move on its own** — write `status` and the date (and
+`stage`, `branch`, `worktree` when starting) in ONE hand edit. After a move by a tool that does
+stamp, read the note back and confirm that `start` (on a move to `doing`) or `done` (on closing) is
+there, and that after a reopen `done` is gone; write the missing stamp, or remove the stale `done`,
+surgically if not. A hand edit is never done with a tool that replaces the whole note (an
+`update_note`-style call): it is a surgical edit of the frontmatter lines it changes (a file
+edit), or a status tool that stamps the field when there is one.
+
+⚠️ Write no second end date (`end`, `finished`, …). A project that already has one keeps
+reading it as a fallback when `done` is missing; new notes never get it.
+
+⚠️ `milestone` names a note that must exist — the planning skill says where and how it looks. A
+mistyped id silently creates a milestone nobody planned: list the existing ids before writing one,
+and ask before inventing a new one.
+
+The repo backend (§2b) keeps one file per task and no frontmatter: nothing here applies to it.
+
 ## 3. Reality check before writing code
 
 Verify the selected task's checklist **against the code**, not against the checklist's own claims:
@@ -201,7 +288,8 @@ user's approval, show any `doing` task whose `worktree` is that checkout and ask
 worktree. An empty `worktree` is the main checkout (§2a).
 
 If you notice work missing elsewhere, **record it as a task** where the declaration says work is
-tracked — status `todo`, with its scope, *Not Doing* and the files it would touch. With no
+tracked — status `todo`. In a vault: a card (§2d: goal, criteria, *Not Doing*, the files it would
+touch) and a brief that carries its scope; the repo backend records it in its own file form (§2b). With no
 declaration, list it for the user and ask where it belongs. Do not start it — and do not hand it
 to a separate session of its own either.
 
@@ -216,7 +304,11 @@ decision by the user — update the task record **before starting the next step*
 
 - tick the checkbox that is now done (surgically, §7);
 - move `status` / `stage` if the step moved it (*The lifecycle*) — vault backend only;
-- add one dated line with the observed result, e.g. `2026-01-14 — opened #42; pipeline green at a1b2c3d`.
+- if the step opened a merge/pull request, write its URL to `mr` (§2d) — append to the list when
+  the task already has one — vault backend only;
+- add one dated line with the observed result under the card's `## Log` heading (§2d), newest last
+  — vault backend only; the repo backend has no card (§2b) —
+  e.g. `2026-01-14 — opened #42; pipeline green at a1b2c3d`.
 
 Write from the result you observed — the output, the link, the commit — not from what you expected
 the step to produce. A line written ahead of its result is a claim nobody checked.
@@ -242,6 +334,7 @@ If you cannot find them, **ask**.
 - Closing is the user's call. You report what was done and what appears finished.
 - Never commit without showing the message first.
 - Once the user agrees: write the closure (the closure skill says where it goes), then set the
-  closed status the user chose — in that order.
+  closed status the user chose — in that order. The move stamps `done` (§2d); it clears nothing
+  else.
 - **A task in `review` may be closed from any session — only after asking the user.** Except a
   parallel piece: its orchestrator or the user closes it; any other session only reports it.

@@ -43,10 +43,63 @@ Anything unresolved from the discussion goes into the plan as an open question, 
 piece it affects. Questions that stay in the conversation reappear during implementation as
 surprises, at the point where they are most expensive to answer.
 
+## Put the pieces under a milestone (vault backend)
+
+*This section and the next apply to the vault backend. The repo backend keeps one file per task
+and no frontmatter; for it nothing here changes (task-flow, §2b).*
+
+Work that ships together — a release, a version, a named effort — is grouped under a
+**milestone**, so "what is left of this one" is a question the task list can answer. When the work
+you are planning belongs to one, **every piece carries it**: `milestone: <id>` in each task's
+frontmatter (the id itself, never a path and never a link `[[…]]`; quote an id that looks like a number:
+`"1.10"`). A piece
+planned without it falls out of the milestone's view and nobody notices.
+
+A milestone is a note of its own, named by its id, in the folder the declaration's `milestones`
+field names (`.memoz/tasks.json`; task-flow, §1): `<milestones>/<id>.md`. **If the field is
+missing, ask the user where milestones live — do not guess, and do not derive it from `folder`**
+(that is the project folder in some projects and the task folder in others, and a milestone filed
+among the tasks mixes into the task lists). Whoever reads milestones finds them by `type: milestone`
+and the file name.
+
+```
+---
+type: milestone
+start: 2026-10-12
+due: 2026-11-30
+---
+# <id>
+One line: what this milestone delivers.
+```
+
+- The template has no inline `#` comments, and neither should a real milestone note: readers
+  parse each line with a regular expression and would keep the comment as part of the value.
+- `start` and `due` (`YYYY-MM-DD`) are the **plan**, and they are the user's to give. Ask; never invent a date to
+  fill the field — an invented `due` turns every overdue marker into noise. (In a task, `start` is
+  the actual day work began — task-flow, §2d.)
+- The **actual** dates are not written here. They come from the tasks: the first `start` among the
+  milestone's tasks and the last `done` among its closed tasks, **leaving out `dropped` ones**
+  in both (abandoned work neither began nor ended the milestone). Two copies of one fact drift.
+- The id is unique within the milestones folder. Look there before choosing one, and use an
+  existing id exactly as spelled — a near-miss makes a second milestone. If the milestone does not
+  exist yet, create its note first (with the user's dates), then the tasks that name it.
+- No milestone fits? Say so and ask; a task without a milestone is allowed, a guessed one is not.
+
+## Give each piece a card and a brief (vault backend)
+
+Each piece is a task **card**: frontmatter (with `milestone`), a one-line goal, links, completion
+criteria, *Not Doing*, a `## Log` section of one-line dated entries. Task-flow, *The task card, its folder and its
+fields*, has the layout. A piece that has a scope also gets a **brief** in the task's own folder
+(`<prefix>-NN/<prefix>-NN brief`): why the piece exists, its scope, what it changes. The brief is
+required; only a one-line fix whose scope fits in the goal line goes without. Write it now, while
+the reasoning is fresh; the exclusions and the criteria stay on the card, because the card is what
+gets checked, and the card links to the brief.
+
 ## Leave the plan where the work is tracked
 
 The plan is not a separate artefact. It is the set of tasks the project already tracks: each
-piece a task with its criteria and its exclusions, in whatever form that project uses. Read the
+piece a task with its criteria and its exclusions, in whatever form that project uses (in a vault,
+the card above). Read the
 declaration (`.memoz/tasks.json`) for where that is; ask if it is missing.
 
 ⚠️ Do not invent a second place for the plan to live. A plan kept beside the task list becomes
