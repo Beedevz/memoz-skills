@@ -48,6 +48,14 @@ was already rejected for a reason nobody wrote down.
 
 ### Unclosed criteria stay visible
 
+**Refuse to close while a completion criterion is still `[ ]`.** Read the task's criteria first and
+list every `[ ]` back to the user, and every `[~]` already written, so the user confirms its reason.
+Each `[ ]` becomes `[x]` (it is met, and you saw the evidence) or `[~]` — it will not be met inside
+this task: its reason, and where it went (a follow-up task, …) — the user decides which and confirms
+every `[~]`; do not tick it to make the list empty. Only when none is left does the closed status
+follow. A task closed without completing it (`dropped`, …) is exempt: its boxes stay as they are,
+and the closure states the reason once.
+
 An unmet criterion is written as unmet, with the reason. Presenting it as done is the most
 expensive mistake available here: it removes the only signal that would have prompted anyone to
 finish it.

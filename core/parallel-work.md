@@ -42,6 +42,9 @@ after each of: a commit it has verified (the
 implementer's own commits are checkpointed here, when the orchestrator verifies them) · a reviewer
 report recorded · a measurement round · the branch pushed · a stage changed · a decision by the human · a merge/pull
 request opened · a merge.
+Each of those checkpoints also **ticks the criteria the step met** — after the orchestrator has
+verified them; the implementer's report names the criteria it believes are met, and a belief is not
+a tick.
 
 ## 1. Before anything starts
 
@@ -81,7 +84,7 @@ request opened · a merge.
 - [ ] ⚠️ **Check the reviewer's reasoning too, not only its conclusion.** A finding can be right for the wrong reason ("this was already like that on the base branch" — it was not).
 - [ ] **Record the reviewer's report in the piece's report note yourself** (`<prefix>-NN report`, or `<prefix>-NN T<k> report` in the parent's folder for a sub-task piece; read it first, create it if absent, never overwrite it), verbatim, through the server you settled on, and mark each finding *reproduced* or *not reproduced*. The reviewer role carries no knowledge-layer tools on purpose: a server name fixed in a tool list follows one vault, not the project.
 - [ ] **Send the fix back to the implementer** — its context is still there. Do not write the fix yourself: then nobody verifies it.
-- [ ] Verify the follow-up commit as well (only the requested files? does the mutation die now?) → `stage: verified`.
+- [ ] Verify the follow-up commit as well (only the requested files? does the mutation die now?) → `stage: verified` (the condition is task-flow's, *The lifecycle*: criteria that can be met before the merge are ticked or `[~]`; the rest are named in the checkpoint line).
 
 ## 4. Push and merge
 
@@ -93,6 +96,7 @@ request opened · a merge.
 
 ## 5. Closing
 
-- [ ] Close each piece with the closure skill, then set the closed status the human chose (the move stamps `done`, task-flow §2d). Who may close a piece in `review` is settled in one place: the task-flow skill.
+- [ ] **Every completion criterion on each card is `[x]`, or `[~]` with its reason** — list the ones still `[ ]` to the human; the closure skill refuses to close while one is left.
+- [ ] Close each piece with the closure skill, then set the closed status the human chose (the move stamps `done` and removes `stage`; read it back, task-flow §2d). Who may close a piece in `review` is settled in one place: the task-flow skill.
 - [ ] Ask the human how to classify each candidate recurring mistake — new shape, or another occurrence of an existing one — and record it (see the recurring-mistake log).
 - [ ] Remove merged worktrees and their local branches — with the human's approval, after confirming each is clean and its branch is on the base branch.

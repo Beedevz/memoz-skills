@@ -18,7 +18,11 @@ at once to *parallel work*.
 - `status`: `todo` → `doing` → `review` (waiting for the human: approval, merge) → the vault's
   closed status (`done`, `dropped`, … — read which ones the vault uses; never assume one).
 - `stage`, while `doing`: `implementing` → `agent-review` (only when a reviewer agent runs) →
-  `verified` (the verification passed). A merge is a checkpoint line, not a stage.
+  `verified` (the verification passed **and** every criterion that can be met before the merge is
+  `[x]`, or `[~]` with its reason; one that waits on a later event (a merge, a deploy, a later task)
+  stays `[ ]` and is named in the `verified` checkpoint line — `[~]` is never a placeholder for a
+  criterion that can still be met). A merge is a checkpoint line, not a stage. A closed task has
+  **no** `stage` (§2d).
 
 The shape of the record — the short card, the task's folder, and the `milestone` · `start` ·
 `done` · `mr` fields — is §2d.
@@ -227,17 +231,23 @@ In a **task**, `start` is the day work *actually* began. In a **milestone** note
 **The stamp rule.** On a move to `doing`, write `start` (today) if it is empty; never overwrite a
 `start` that is set; never write it without a move — a task already `doing` stays as it is, and a
 `doing` task whose `start` is empty is not backfilled. On the move to the closed status, write
-`done` in the same write. On a move from a closed status back to an open one, remove `done`, so
-a later re-close stamps the new date instead of keeping the first.
+`done` and remove the `stage` line in the same write — a closed task has no stage. On a move from
+a closed status back to an open one, remove `done` (so a later re-close stamps the new date instead
+of keeping the first). A reopen to `todo` carries no `stage`. A reopen to `doing` is a start: follow
+§2a *Starting* and §4 (branch, worktree, one `doing` per worktree, the concurrent-work check) and set
+`stage: implementing` — or the stage the user names; a move from `review` back to `doing` for rework
+sets `stage: implementing` too. If the status tool does not write the `stage`, write it right after
+by a surgical hand edit; the read-back below confirms.
 
 ⚠️ Whether a status tool stamps `start` and `done` depends on the tool. One that does not (an
 editor, a note written by hand — an agent editing the file is exactly that) leaves them empty, and
 a field the writer skipped is not "unknown", it is a hole in every list that reads it. So: **a
 tool that does not stamp is not used for the move on its own** — write `status` and the date (and
-`stage`, `branch`, `worktree` when starting) in ONE hand edit. After a move by a tool that does
-stamp, read the note back and confirm that `start` (on a move to `doing`) or `done` (on closing) is
-there, and that after a reopen `done` is gone; write the missing stamp, or remove the stale `done`,
-surgically if not. A hand edit is never done with a tool that replaces the whole note (an
+`stage`, `branch`, `worktree` when starting; `done` and the removal of `stage` when closing) in ONE
+hand edit. After a move — by a stamping tool or by hand — read the note back and confirm that
+`start` (on a move to `doing`) or `done` (on closing) is there, that after closing `stage` is gone,
+that after a reopen `done` is gone, and that after a reopen to `doing` `stage` is set; write the
+missing stamp or stage, or remove the stale `done` or `stage`, surgically if not. A hand edit is never done with a tool that replaces the whole note (an
 `update_note`-style call): it is a surgical edit of the frontmatter lines it changes (a file
 edit), or a status tool that stamps the field when there is one.
 
@@ -325,12 +335,17 @@ If you cannot find them, **ask**.
 
 - Tick only the checkboxes that are genuinely done — **surgically**. Never round-trip a note
   through parse-and-serialize: it destroys comments, nested keys and anything non-flat.
+- **No `[ ]` is left behind at the close.** At `stage: verified` the lifecycle's rule applies. Before
+  asking to close, none is `[ ]` (the closure skill lists them back): each is `[x]`, or `[~]` — the
+  criterion will not be met inside this task, with its reason and where it went (a follow-up task,
+  …); the user confirms it. ⚠️ A closed task is not a ticked task: closed notes kept unticked boxes and a stale `stage`,
+  and the card then reads as unfinished work.
 - A criterion you could not close is written as `[~]` **with the reason**. Presenting it as closed
   is the most expensive mistake in this workflow.
 - Closing is the user's call. You report what was done and what appears finished.
 - Never commit without showing the message first.
 - Once the user agrees: write the closure (the closure skill says where it goes), then set the
-  closed status the user chose — in that order. The move stamps `done` (§2d); it clears nothing
-  else.
+  closed status the user chose — in that order. The move stamps `done` and removes `stage` (§2d);
+  it clears nothing else.
 - **A task in `review` may be closed from any session — only after asking the user.** Except a
   parallel piece: its orchestrator or the user closes it; any other session only reports it.
