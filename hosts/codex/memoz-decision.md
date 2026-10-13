@@ -61,11 +61,13 @@ decision filed under a task cannot be.
 A task decision carries no `status` (it is not a task), and no number outside its task — numbering
 is per task (per sub-task piece, for a sub-task), so there is no "next free number" to track.
 
-It does carry one frontmatter field, `scope`: `scope: task` for a decision that matters only to its
-task, `scope: project` for one that also affects the project (the one kept to its one-sentence
-*Decision* and the link). Exactly those two values, lowercase — a reader that finds anything else, or
-no field, shows no scope rather than guessing. Not sure which? The rule above already answers:
-`scope: project`.
+Besides the usual vault fields (such as `tags`), it carries a `scope` field: `scope: task` for a
+decision that matters only to its task, `scope: project` for one that also affects the project (the
+one kept to its one-sentence *Decision* and the link). Exactly those two values, lowercase — a
+reader that finds anything else, or no field, shows no scope rather than guessing. Not sure which?
+The rule above already answers: `scope: project`. Put no inline `#` comment on the `scope` line:
+readers take the rest of the line as the value, so `scope: project  # also in Decisions` is not
+`project`.
 
 ## Do not merge it into the work record
 
