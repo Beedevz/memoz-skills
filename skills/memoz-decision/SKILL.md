@@ -66,11 +66,11 @@ is per task (per sub-task piece, for a sub-task), so there is no "next free numb
 
 Besides the usual vault fields (such as `tags`), it carries a `scope` field: `scope: task` for a
 decision that matters only to its task, `scope: project` for one that also affects the project (the
-one kept to its one-sentence *Decision* and the link). Exactly those two values, lowercase — a
-reader that finds anything else, or no field, shows no scope rather than guessing. Not sure which?
-The rule above already answers: `scope: project`. Put no inline `#` comment on the `scope` line:
-readers take the rest of the line as the value, so `scope: project  # also in Decisions` is not
-`project`.
+one kept to its one-sentence *Decision* and the link). Write exactly `task` or `project`,
+lowercase. Not sure which? Treat it as a project decision: write the project record, and this note
+with its one-sentence *Decision*, the link and `scope: project`. Put no inline `#` comment on the
+`scope` line: readers take the rest of the line as the value, so `scope: project  # also in
+Decisions` is not `project`.
 
 ## Do not merge it into the work record
 

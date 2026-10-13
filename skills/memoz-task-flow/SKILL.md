@@ -208,7 +208,7 @@ uses them):
 | note | name | holds |
 |---|---|---|
 | brief | `<prefix>-NN/<prefix>-NN brief` (a sub-task note with a scope of its own: `<prefix>-NN T<k> brief`; without one, the parent's brief is its brief) | why · scope · what changes |
-| task decision | `<prefix>-NN/<prefix>-NN D<n> — <title>` (`D1`, `D2`, … counted inside this task); a sub-task piece's: `<prefix>-NN T<k> D<n> — <title>`, in the parent's folder, so numbers never collide | one decision, with the fields of the decision skill and a frontmatter `scope: task` (`scope: project` for one that also affects the project; no `status`); one that also affects the project keeps only its one-sentence *Decision* and a link to the project record (decision skill) |
+| task decision | `<prefix>-NN/<prefix>-NN D<n> — <title>` (`D1`, `D2`, … counted inside this task); a sub-task piece's: `<prefix>-NN T<k> D<n> — <title>`, in the parent's folder, so numbers never collide | one decision, with the fields of the decision skill and a frontmatter `scope: task` (no `status`); one that also affects the project carries `scope: project` and keeps only its one-sentence *Decision* and a link to the project record (decision skill) |
 | report | `<prefix>-NN/<prefix>-NN report` (a sub-task note: `<prefix>-NN T<k> report`, in the parent's folder — never the parent's report note, so two pieces never append to one note) | what comes back from the work, appended in order: implementer reports, reviewer reports (verbatim), and the closure when it is a *Closed* section (closure skill) |
 
 **A brief is required for every task that has a scope.** Only a one-line fix is exempt — a task
