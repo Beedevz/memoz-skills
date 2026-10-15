@@ -3,16 +3,19 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import type { BandSnapshot, BandTask } from '../types'
 import {
+  bandTask,
   barRuns,
   byPriority,
-  countText,
   parseNote,
+  resolveStalledDays,
+  rowAlt,
+  rowCells,
   rowLayout,
-  truncate,
+  utcDay,
   type ParsedNote,
   type RunKind,
 } from './band-model'
-import { rowAlt, rowSvg } from './band-svg'
+import { desktopLayout, rowSvg } from './band-svg'
 
 const snapshot = atom(
   { plugin: 'memoz-task-band', key: 'snapshot' } as const,
@@ -27,12 +30,11 @@ const REFRESH_MS = 30_000
 const DESKTOP_PX_PER_COLUMN = 8
 const DESKTOP_HIDE_PX = 36
 const STATUS_COLOR = { doing: 'warning', review: 'suggestion' } as const
-const RUN_STYLE: Record<RunKind, { color?: string; dimColor?: boolean; bold?: boolean }> = {
+const RUN_STYLE: Record<RunKind, { color?: string; dimColor?: boolean }> = {
   fill: { color: 'success' },
   'tick-fill': { color: 'success' },
   empty: { dimColor: true },
   'tick-empty': { color: 'subtle' },
-  pill: { bold: true },
 }
 
 type Declaration = { vault: string; folder: string }
@@ -86,6 +88,20 @@ async function listNotes($: EngineInterface, dir: string, prefix: string): Promi
   return found
 }
 
+// `stalledDays` from the vault's `.memoz/settings.json`; a missing, unreadable or
+// unusable value is the default (2).
+async function readStalledDays($: EngineInterface, vault: string): Promise<number> {
+  const path = `${vault}/.memoz/settings.json`
+  try {
+    if (!(await $.fs.exists(path))) return resolveStalledDays(undefined)
+    const parsed: unknown = JSON.parse(await $.fs.read(path))
+    const value = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>).stalledDays : undefined
+    return resolveStalledDays(value)
+  } catch {
+    return resolveStalledDays(undefined)
+  }
+}
+
 async function scan($: EngineInterface): Promise<BandSnapshot> {
   const declaration = await findDeclaration($)
   if (declaration === null) return { kind: 'none' }
@@ -95,6 +111,8 @@ async function scan($: EngineInterface): Promise<BandSnapshot> {
   const root = `${vault}/${declaration.folder}`
   if (!(await $.fs.exists(root))) return { kind: 'missing', path: root }
 
+  const stalledDays = await readStalledDays($, vault)
+  const today = utcDay(await $.clock.now())
   const next = new Map<string, { mtimeMs: number; size: number; note: ParsedNote }>()
   const tasks: BandTask[] = []
   for (const file of await listNotes($, root, '')) {
@@ -103,14 +121,7 @@ async function scan($: EngineInterface): Promise<BandSnapshot> {
     const note = isFresh ? cached.note : parseNote(await $.fs.read(file.path))
     next.set(file.path, { mtimeMs: file.mtimeMs, size: file.size, note })
     if (note.status !== 'doing' && note.status !== 'review') continue
-    tasks.push({
-      id: file.id,
-      status: note.status,
-      stage: note.stage,
-      priority: note.priority,
-      done: note.done,
-      total: note.total,
-    })
+    tasks.push(bandTask(file.id, note.status, note, file.mtimeMs, today, stalledDays))
   }
   cache = next
   return { kind: 'tasks', tasks: tasks.sort(byPriority) }
@@ -201,11 +212,12 @@ export const register: Register = (on, options) => {
     if (e.surface === 'desktop') {
       const { Svg } = $.ui.resolve(e)
       const width = Math.max(320, e.props.bodyColumns * DESKTOP_PX_PER_COLUMN - DESKTOP_HIDE_PX)
+      const layout = desktopLayout(shown, width)
       return (
         <Box flexDirection="column">
           {shown.map(task => (
             <Box key={task.id} flexDirection="row" alignItems="center" gap={1}>
-              <Svg source={rowSvg(task, width)} alt={rowAlt(task)} />
+              <Svg source={rowSvg(task, width, layout)} alt={rowAlt(task)} />
               <Button
                 key={`hide:${task.id}`}
                 plain
@@ -224,25 +236,34 @@ export const register: Register = (on, options) => {
 
     return (
       <Box flexDirection="column">
-        {layout && shown.map(task => (
-          <Box key={task.id} flexDirection="row">
-            <Text color={STATUS_COLOR[task.status]}>● </Text>
-            <Text>{truncate(task.id, layout.titleWidth).padEnd(layout.titleWidth)}  </Text>
-            {barRuns(task, layout.barWidth).map((run, index) => (
-              <Text key={`${task.id}:run:${index}`} {...RUN_STYLE[run.kind]}>
-                {run.text}
-              </Text>
-            ))}
-            <Text dimColor>  {countText(task).padStart(layout.countWidth)}  </Text>
-            <Button
-              key={`hide:${task.id}`}
-              plain
-              dimColor
-              label="✕"
-              onPress={() => update($, hidden, ids => (ids.includes(task.id) ? ids : [...ids, task.id]))}
-            />
-          </Box>
-        ))}
+        {layout && shown.map(task => {
+          const cells = rowCells(task, layout)
+          return (
+            <Box key={task.id} flexDirection="row">
+              <Text color={task.priority === 1 ? 'error' : undefined} dimColor={task.priority !== 1}>{cells.priority}</Text>
+              <Text bold>{cells.code}</Text>
+              <Text>{cells.title}  </Text>
+              <Text color={STATUS_COLOR[task.status]}>{cells.dots}</Text>
+              <Text color={task.stage === null && task.status === 'doing' ? 'warning' : undefined}>{cells.name}  </Text>
+              {barRuns(task, layout.barWidth).map((run, index) => (
+                <Text key={`${task.id}:run:${index}`} {...RUN_STYLE[run.kind]}>
+                  {run.text}
+                </Text>
+              ))}
+              <Text dimColor> {cells.count}</Text>
+              {layout.ageWidth > 0 ? <Text dimColor>  {cells.age}</Text> : null}
+              {layout.flagWidth > 0 ? <Text color="error">  {cells.flag}</Text> : null}
+              <Text>  </Text>
+              <Button
+                key={`hide:${task.id}`}
+                plain
+                dimColor
+                label="✕"
+                onPress={() => update($, hidden, ids => (ids.includes(task.id) ? ids : [...ids, task.id]))}
+              />
+            </Box>
+          )
+        })}
         {footer}
       </Box>
     )
