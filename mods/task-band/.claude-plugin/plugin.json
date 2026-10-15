@@ -1,7 +1,7 @@
 {
   "name": "memoz-task-band",
-  "version": "0.1.0",
-  "description": "A band above the Claude Code prompt showing the project's doing and review Memoz tasks: stage, completion criteria and progress.",
+  "version": "0.2.0",
+  "description": "A band above the Claude Code prompt showing the project's doing and review Memoz tasks: stage, completion criteria, the age of the last step, and flags for work that has stalled or whose record disagrees with its status.",
   "homepage": "https://github.com/Beedevz/memoz-skills",
   "license": "MIT",
   "author": {

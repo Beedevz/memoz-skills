@@ -140,12 +140,26 @@ implementer is given that server by name, and stops rather than write into a dif
 ### Task band (Claude Code mod)
 
 An optional second plugin, `memoz-task-band`, draws a band above the Claude Code prompt with the
-project's tasks that are `doing` or in `review`: one row per task, its stage as a pill
-(`implementing 1/4` → `agent-review 2/4` → `verified 3/4` → `review 4/4`), and a progress bar
-over its completion criteria (`- [x]` of all `- [ ]`/`- [x]`/`- [~]` boxes; the stage when the
-note has none). The desktop app draws the bar as a graphic, the terminal as text. ✕ hides a row
-for the session; `n hidden · show` brings them back. It reads the same `.memoz/tasks.json`
-declaration as the skills and never writes to the vault.
+project's tasks that are `doing` or in `review`: one row per task. A row reads, left to right:
+priority (`P1`), the task code and title, its **stage** (four dots and the name: `implementing` →
+`agent-review` → `verified` → `review`), its **criteria** (a bar and `n/m`: ticked boxes of all
+`[ ]`/`[x]`/`[~]` boxes, counted by the same rule as the Memoz app), the **age of the last step**
+(`today`, `3d ago`) and a **flag** when the record disagrees with the status: `stalled` (a `doing`
+task whose last step is `stalledDays` or more days old), `no stage` and `no branch` (a `doing` task
+without a `stage:` or `branch:`), `no MR` (a `review` task without an `mr:`). The last step is the
+newer of the newest dated line (`- 2026-10-12 — …`) under a Log heading of the note and its `start:`
+stamp (the note's file time only when it has neither). A Log heading is a heading of any level whose
+text starts with `Log` or `Logs`; its deeper sub-headings belong to it, and it ends at the next
+heading of the same or a higher level. Dates are read as UTC days. `stalledDays` is read from the
+vault's `.memoz/settings.json` (a whole number of at least 1; default 2). Widths are counted in
+terminal columns (CJK and emoji take two). On a narrow band the pieces go in this order: the flag
+text becomes a `!`, then the stage name goes (the dots stay), then the age, then the title shrinks.
+On a very narrow band the row no longer fits and runs past the edge; where that happens depends on
+the tasks shown (the length of their codes and counts, whether any has a flag or a priority),
+somewhere around 40 to 45 columns. The desktop app draws the bar as a graphic, the terminal as text.
+✕ hides a row for the session; `n hidden · show` brings them back. A task is `doing` or `review` by
+its `status:` value as written, case ignored (a quoted `"doing"` is not a status, as in the app). It
+reads the same `.memoz/tasks.json` declaration as the skills and never writes to the vault.
 
 ```bash
 claude plugin install memoz-task-band@memoz-skills
