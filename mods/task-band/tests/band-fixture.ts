@@ -456,9 +456,120 @@ export default {
   ],
   "fieldCases": [
     {
+      "name": "a plain status",
+      "note": "---\nstatus: doing\n---\n",
+      "expected": {
+        "status": "doing",
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
+      "name": "a status is read as written: a double-quoted one keeps its quotes",
+      "note": "---\nstatus: \"doing\"\n---\n",
+      "expected": {
+        "status": "\"doing\"",
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
+      "name": "a status is read as written: a single-quoted one keeps its quotes",
+      "note": "---\nstatus: 'doing'\n---\n",
+      "expected": {
+        "status": "'doing'",
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
+      "name": "a status is trimmed and lower-cased",
+      "note": "---\nstatus:   Doing  \n---\n",
+      "expected": {
+        "status": "doing",
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
+      "name": "a status of ~ or null is the word, not nothing",
+      "note": "---\nstatus: ~\n---\n",
+      "expected": {
+        "status": "~",
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
+      "name": "an empty status is no status",
+      "note": "---\nstatus:\n---\n",
+      "expected": {
+        "status": null,
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
+      "name": "a status in a flow list is no status",
+      "note": "---\nstatus: [doing]\n---\n",
+      "expected": {
+        "status": null,
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
+      "name": "a status in a block list is no status",
+      "note": "---\nstatus:\n  - doing\n---\n",
+      "expected": {
+        "status": null,
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
+      "name": "the last row of a duplicated status wins",
+      "note": "---\nstatus: todo\nstatus: review\n---\n",
+      "expected": {
+        "status": "review",
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
+      "name": "a nested status is read as a status of its own",
+      "note": "---\nstatus: doing\nmeta:\n  status: review\n---\n",
+      "expected": {
+        "status": "review",
+        "start": null,
+        "stage": null,
+        "hasBranch": false,
+        "hasMr": false
+      }
+    },
+    {
       "name": "the last row of a duplicated start wins",
       "note": "---\nstatus: doing\nstart: 2026-10-01\nstart: 2026-10-09\n---\n",
       "expected": {
+        "status": "doing",
         "start": "2026-10-09",
         "stage": null,
         "hasBranch": false,
@@ -469,6 +580,7 @@ export default {
       "name": "the last row of a duplicated stage wins",
       "note": "---\nstatus: doing\nstage: implementing\nstage: verified\n---\n",
       "expected": {
+        "status": "doing",
         "start": null,
         "stage": "verified",
         "hasBranch": false,
@@ -479,6 +591,7 @@ export default {
       "name": "a duplicate with nothing after the colon empties the key",
       "note": "---\nstatus: doing\nstage: verified\nstage:\n---\n",
       "expected": {
+        "status": "doing",
         "start": null,
         "stage": null,
         "hasBranch": false,
@@ -489,6 +602,7 @@ export default {
       "name": "a nested start is read as a start of its own",
       "note": "---\nstatus: doing\nmeta:\n  start: 2026-10-09\n---\n",
       "expected": {
+        "status": "doing",
         "start": "2026-10-09",
         "stage": null,
         "hasBranch": false,
@@ -499,6 +613,7 @@ export default {
       "name": "an indented top-level key is read",
       "note": "---\nstatus: doing\n  start: 2026-10-09\n  stage: verified\n---\n",
       "expected": {
+        "status": "doing",
         "start": "2026-10-09",
         "stage": "verified",
         "hasBranch": false,
@@ -509,6 +624,7 @@ export default {
       "name": "a nested key overrides an earlier top-level one",
       "note": "---\nstatus: doing\nstart: 2026-10-01\nmeta:\n  start: 2026-10-09\n---\n",
       "expected": {
+        "status": "doing",
         "start": "2026-10-09",
         "stage": null,
         "hasBranch": false,
@@ -519,6 +635,7 @@ export default {
       "name": "one pair of quotes goes",
       "note": "---\nstatus: doing\nstart: \"2026-10-10\"\nstage: 'verified'\n---\n",
       "expected": {
+        "status": "doing",
         "start": "2026-10-10",
         "stage": "verified",
         "hasBranch": false,
@@ -529,6 +646,7 @@ export default {
       "name": "a quote pair that does not match stays",
       "note": "---\nstatus: doing\nstage: \"verified'\n---\n",
       "expected": {
+        "status": "doing",
         "start": null,
         "stage": "\"verified'",
         "hasBranch": false,
@@ -539,6 +657,7 @@ export default {
       "name": "empty markers carry nothing",
       "note": "---\nstatus: doing\nstage: ~\nbranch: null\nmr: []\nstart:\n---\n",
       "expected": {
+        "status": "doing",
         "start": null,
         "stage": null,
         "hasBranch": false,
@@ -549,6 +668,7 @@ export default {
       "name": "a block list is its items",
       "note": "---\nstatus: doing\nbranch:\n  - feat/x\nmr:\n  - 7\n---\n",
       "expected": {
+        "status": "doing",
         "start": null,
         "stage": null,
         "hasBranch": true,
@@ -559,6 +679,7 @@ export default {
       "name": "a branch is its first value, an MR any value",
       "note": "---\nstatus: doing\nbranch: [~, feat/x]\nmr: [~, 7]\n---\n",
       "expected": {
+        "status": "doing",
         "start": null,
         "stage": null,
         "hasBranch": false,
@@ -569,6 +690,7 @@ export default {
       "name": "an unindented dash is not a list item",
       "note": "---\nstatus: doing\nbranch:\n- feat/x\n---\n",
       "expected": {
+        "status": "doing",
         "start": null,
         "stage": null,
         "hasBranch": false,

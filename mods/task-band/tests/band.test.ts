@@ -13,6 +13,7 @@ import {
   lastLogDate,
   lastTouch,
   parseNote,
+  priorityText,
   resolveStalledDays,
   rowAlt,
   rowCells,
@@ -190,6 +191,22 @@ for (const surface of ['terminal', 'desktop'] as const) {
       await ui.unmount()
     })
 
+    test('a quoted status is no status here either, as in the app; the case does not matter', OPTIONS, async ($, on) => {
+      const files = fixtureFiles()
+      files.set(`${TASKS}/ABC-5 — quoted.md`, { text: note('status: "doing"\npriority: 1', '- [ ] x'), mtimeMs: 1 })
+      files.set(`${TASKS}/ABC-6 — single.md`, { text: note("status: 'review'\npriority: 1", '- [ ] x'), mtimeMs: 1 })
+      files.set(`${TASKS}/ABC-7 — upper.md`, { text: note('status: Doing\npriority: 1', '- [ ] x'), mtimeMs: 1 })
+      const { clock } = world(on, files)
+      await start($, clock)
+
+      const ui = await mount($)
+      const texts = await shownText(ui)
+      expect(texts).not.toContain('quoted')
+      expect(texts).not.toContain('single')
+      expect(texts).toContain('upper')
+      await ui.unmount()
+    })
+
     test('stalledDays from the vault settings moves the threshold', OPTIONS, async ($, on) => {
       const files = fixtureFiles()
       files.set(`${VAULT}/.memoz/settings.json`, { text: '{"stalledDays": 7}', mtimeMs: 1 })
@@ -349,9 +366,13 @@ describe('shared fixture (tests/band-fixture.ts, the Memoz app keeps a copy)', (
   for (const { name, note: text, expected } of fixture.fieldCases) {
     test(`fields: ${name}`, () => {
       const parsed = parseNote(text)
-      expect({ start: parsed.start, stage: parsed.stage, hasBranch: parsed.hasBranch, hasMr: parsed.hasMr }).toEqual(
-        expected,
-      )
+      expect({
+        status: parsed.status,
+        start: parsed.start,
+        stage: parsed.stage,
+        hasBranch: parsed.hasBranch,
+        hasMr: parsed.hasMr,
+      }).toEqual(expected)
     })
   }
 
@@ -371,9 +392,9 @@ test('the Log reader is also reachable on a bare body', () => {
 
 // ── reading a note ───────────────────────────────────────────────────────
 
-test('parseNote reads the fields, one pair of quotes off, and empty markers as nothing', () => {
+test('parseNote reads the fields, one pair of quotes off (not the status), and empty markers as nothing', () => {
   const parsed = parseNote(
-    note('status: "doing"\nstage: verified\npriority: 3\nstart: "2026-10-12"\nbranch: ~\nmr: []', '- [x] a'),
+    note('status: DOING\nstage: verified\npriority: 3\nstart: "2026-10-12"\nbranch: ~\nmr: []', '- [x] a'),
   )
   expect(parsed).toMatchObject({
     status: 'doing',
@@ -724,11 +745,53 @@ test('a wide title is cut before the stage dots on the desktop', () => {
   for (const width of [320, 600, 1000]) {
     const tasks = titled('日本語のとても長いタイトルがここにあります'.repeat(2))
     const layout = desktopLayout(tasks, width)
-    const label = layout.labelEnd - 26
+    const label = layout.labelEnd - layout.priorityWidth
     const title = fitTitle('日本語のとても長いタイトルがここにあります'.repeat(2), label, 13)
     expect(textWidth(title, 13)).toBeLessThanOrEqual(label)
     expect(title.endsWith('…')).toBe(true)
     // a CJK character is about one em (13px) wide: no more of them than fit in the label
     expect(splitGraphemes(title).length - 1).toBeLessThanOrEqual(Math.floor(label / 13))
   }
+})
+
+// ── the priority column is as wide as the widest priority in the set ──
+
+const withPriorities = (...priorities: (number | null)[]): BandTask[] =>
+  priorities.map((priority, index) => ({
+    ...taskOf('status: doing\nstage: verified\nbranch: b', '- [x] a'),
+    id: `ABC-${index + 1} — task ${index + 1}`,
+    priority,
+  }))
+
+test('the priority column fits the widest priority: P12, P1 beside P10, 1.5, -1, none at all', () => {
+  const sets: [string, BandTask[], string][] = [
+    ['P12', withPriorities(12), 'P12 ABC-1'],
+    ['P1 and P10', withPriorities(1, 10), 'P1  ABC-1'],
+    ['1.5', withPriorities(1.5, 2), 'P1.5 ABC-1'],
+    ['-1', withPriorities(-1), 'P-1 ABC-1'],
+    ['none', withPriorities(null, null), 'ABC-1'],
+    ['one without, one with', withPriorities(null, 3), '   ABC-1'],
+  ]
+  for (const [name, tasks, start] of sets) {
+    for (const columns of [60, 80, 120]) {
+      const layout = rowLayout(tasks, columns)
+      expect(`${name} ${rowWidth(layout)}`).toBe(`${name} ${Math.min(rowWidth(layout), columns)}`)
+      for (const task of tasks) expect(`${name} ${displayWidth(rowLine(task, layout))}`).toBe(`${name} ${rowWidth(layout)}`)
+      expect(`${name} ${rowLine(tasks[0]!, layout).startsWith(start)}`).toBe(`${name} true`)
+    }
+  }
+  expect(rowLayout(withPriorities(null), 80).priorityWidth).toBe(0)
+  expect(rowLayout(withPriorities(12), 80).priorityWidth).toBe(4)
+})
+
+test('on the desktop the priority tag never reaches the label', () => {
+  for (const priority of [1, 12, 100, 1.5, -1]) {
+    const tasks = withPriorities(priority, 2)
+    for (const width of [320, 700, 1100]) {
+      const layout = desktopLayout(tasks, width)
+      expect(textWidth(priorityText(tasks[0]!), 12) + 6).toBeLessThan(layout.priorityWidth)
+      expect(layout.labelEnd).toBeGreaterThan(layout.priorityWidth)
+    }
+  }
+  expect(desktopLayout(withPriorities(null), 700).priorityWidth).toBeLessThan(26)
 })

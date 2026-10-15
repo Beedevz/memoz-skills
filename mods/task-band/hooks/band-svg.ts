@@ -6,6 +6,7 @@ import {
   criteriaText,
   flagText,
   graphemeWidth,
+  priorityText,
   progress,
   splitGraphemes,
   stageName,
@@ -27,7 +28,8 @@ const STAGE_DOT_GAP = 11
 const COLUMN_GAP = 12
 const MIN_TRACK = 90
 const COUNT_WIDTH = 40
-const PRIORITY_WIDTH = 26
+const PRIORITY_MIN = 26
+const PRIORITY_X = 6
 const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif"
 
 const ACCENT = { doing: '#8B87F5', review: '#E8875F' } as const
@@ -84,6 +86,8 @@ const widest = (tasks: readonly BandTask[], text: (task: BandTask) => string, si
   Math.max(0, ...tasks.map(task => textWidth(text(task), size)))
 
 export type DesktopLayout = {
+  /** Where the label starts: after the widest priority tag and a gap; 8 when no row has a priority. */
+  priorityWidth: number
   /** Right edge of the code-and-title label. */
   labelEnd: number
   stageX: number
@@ -111,6 +115,8 @@ export const desktopLayout = (tasks: readonly BandTask[], width: number): Deskto
   const ageWanted = Math.round(widest(tasks, ageText, 12))
   const flagWanted = Math.round(widest(tasks, flagText, 11)) + 14
   const hasFlags = tasks.some(task => task.flags.length > 0)
+  const priorityTag = Math.round(widest(tasks, priorityText, 12))
+  const priorityWidth = priorityTag > 0 ? Math.max(PRIORITY_MIN, PRIORITY_X + priorityTag + 6) : 8
   const dots = STAGE_COUNT * STAGE_DOT_GAP
 
   const build = (
@@ -120,7 +126,7 @@ export const desktopLayout = (tasks: readonly BandTask[], width: number): Deskto
     flagWidth: number,
     flagMark: boolean,
   ): DesktopLayout => {
-    const stageX = PRIORITY_WIDTH + label + COLUMN_GAP
+    const stageX = priorityWidth + label + COLUMN_GAP
     const trackX = stageX + dots + nameWidth + COLUMN_GAP
     const tail =
       COUNT_WIDTH + (ageWidth > 0 ? COLUMN_GAP + ageWidth : 0) + (flagWidth > 0 ? COLUMN_GAP + flagWidth : 0)
@@ -129,7 +135,8 @@ export const desktopLayout = (tasks: readonly BandTask[], width: number): Deskto
     const ageEnd = ageWidth > 0 ? countEnd + COLUMN_GAP + ageWidth : null
     const flagX = (ageEnd ?? countEnd) + COLUMN_GAP
     return {
-      labelEnd: PRIORITY_WIDTH + label,
+      priorityWidth,
+      labelEnd: priorityWidth + label,
       stageX,
       nameWidth,
       trackX,
@@ -195,14 +202,14 @@ export const rowSvg = (
   const priority =
     task.priority === null
       ? ''
-      : `<text class="${task.priority === 1 ? 'urgent' : 'muted'}" x="6" y="${mid + 4.5}" font-size="12" font-weight="700">P${task.priority}</text>`
+      : `<text class="${task.priority === 1 ? 'urgent' : 'muted'}" x="${PRIORITY_X}" y="${mid + 4.5}" font-size="12" font-weight="700">${escapeXml(priorityText(task))}</text>`
 
   const { code, title } = taskLabel(task)
-  const labelWidth = layout.labelEnd - PRIORITY_WIDTH
+  const labelWidth = layout.labelEnd - layout.priorityWidth
   const codeText = fitTitle(code, labelWidth, 13)
   const titleText = fitTitle(title, Math.max(0, labelWidth - textWidth(codeText, 13) - (code === '' ? 0 : 6)), 13)
   const label = [
-    `<text class="title" x="${PRIORITY_WIDTH}" y="${mid + 4.5}" font-size="13">`,
+    `<text class="title" x="${layout.priorityWidth}" y="${mid + 4.5}" font-size="13">`,
     code === '' ? '' : `<tspan font-weight="700">${escapeXml(codeText)}</tspan>`,
     `<tspan class="${code === '' ? 'title' : 'muted'}" dx="${code === '' ? 0 : 6}">${escapeXml(titleText)}</tspan>`,
     '</text>',

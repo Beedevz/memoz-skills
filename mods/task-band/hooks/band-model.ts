@@ -78,7 +78,7 @@ const parseValue = (raw: string): string | string[] => {
 //  - an indented `- item` line under a key is an item of it; the key's value is then the list;
 //  - an empty value or list holds nothing.
 // Values come back as the list of their non-empty items.
-const readFields = (head: string[]): Map<string, string[]> => {
+const readData = (head: string[]): Map<string, string | string[]> => {
   const entries: { line: string; items: string[] }[] = []
   for (const line of head) {
     const item = listItem(line)
@@ -95,11 +95,25 @@ const readFields = (head: string[]): Map<string, string[]> => {
     const raw = line.slice(colon + 1).trim()
     data.set(key, raw === '' && items.length > 0 ? items : parseValue(raw))
   }
+  return data
+}
+
+// The non-empty items of every value, the way the app's task rows hold the fields.
+const readFields = (data: Map<string, string | string[]>): Map<string, string[]> => {
   const fields = new Map<string, string[]>()
   for (const [key, value] of data) {
     fields.set(key, (Array.isArray(value) ? value : [value]).map(item => item.trim()).filter(Boolean))
   }
   return fields
+}
+
+// The status exactly as the app's index holds it: a SCALAR (a list is no status), trimmed and
+// lower-cased, nothing else — quotes stay (`"doing"` is not `doing`), and `~` / `null` are the
+// literal words, not "nothing". An empty value is no status.
+const readStatus = (data: Map<string, string | string[]>): string | null => {
+  const value = data.get('status')
+  if (typeof value !== 'string') return null
+  return value.trim().toLowerCase() || null
 }
 
 const isEmptyValue = (value: string): boolean => value === '' || value === '~' || value.toLowerCase() === 'null'
@@ -275,11 +289,12 @@ export const countBoxes = (body: string): BoxCounts => {
 /** Reads what the band needs from one task note. */
 export const parseNote = (text: string): ParsedNote => {
   const { head, body } = splitNote(text)
-  const fields = head ? readFields(head) : new Map<string, string[]>()
+  const data = head ? readData(head) : new Map<string, string | string[]>()
+  const fields = readFields(data)
   const rawPriority = scalar(fields, 'priority')
   const start = scalar(fields, 'start')
   return {
-    status: scalar(fields, 'status'),
+    status: readStatus(data),
     stage: scalar(fields, 'stage'),
     priority: rawPriority !== null && Number.isFinite(Number(rawPriority)) ? Number(rawPriority) : null,
     ...countBoxes(body),
@@ -541,7 +556,12 @@ export const byPriority = (a: BandTask, b: BandTask): number => {
   return a.id.localeCompare(b.id)
 }
 
+/** `P1`; empty for a task without a priority. */
+export const priorityText = (task: BandTask): string => (task.priority === null ? '' : `P${task.priority}`)
+
 export type RowLayout = {
+  /** Width of the priority column with its blank (`P1 `); 0 when no row has a priority. */
+  priorityWidth: number
   /** Width of the code column (`ABC-77`); 0 when no row has one. */
   codeWidth: number
   titleWidth: number
@@ -560,14 +580,13 @@ export type RowLayout = {
 const MIN_TITLE = 10
 const MIN_BAR = 8
 const GAP = 2
-const PRIORITY_WIDTH = 3 // "P1 "
 const HIDE_WIDTH = 1 // ✕
 
-// The width a row takes: "P1 " code title  dots name  bar count  age  flag  ✕
+// The width a row takes: "P1 " (as wide as the widest priority, plus a blank) code title  dots name  bar count  age  flag  ✕
 // with a single space between the code and the title and the bar and its
 // count, two between the other groups.
 export const rowWidth = (layout: RowLayout): number =>
-  PRIORITY_WIDTH +
+  layout.priorityWidth +
   (layout.codeWidth > 0 ? layout.codeWidth + 1 : 0) +
   layout.titleWidth +
   GAP +
@@ -599,7 +618,9 @@ export const rowLayout = (tasks: readonly BandTask[], columns: number): RowLayou
   const nameWidth = widest(tasks, stageName)
   const ageWidth = widest(tasks, ageText)
   const markWidth = flagWidth > 0 ? 1 : 0
-  const base = { codeWidth, countWidth, titleWidth: 0, barWidth: 0 }
+  const widestPriority = widest(tasks, priorityText)
+  const priorityWidth = widestPriority > 0 ? widestPriority + 1 : 0
+  const base = { priorityWidth, codeWidth, countWidth, titleWidth: 0, barWidth: 0 }
   const steps: { layout: RowLayout; minTitle: number }[] = [
     { layout: { ...base, stageWidth: nameWidth, ageWidth, flagWidth, flagMark: false }, minTitle: MIN_TITLE },
     { layout: { ...base, stageWidth: nameWidth, ageWidth, flagWidth: markWidth, flagMark: true }, minTitle: MIN_TITLE },
@@ -631,7 +652,7 @@ export const rowCells = (task: BandTask, layout: RowLayout): RowCells => {
   const { code, title } = taskLabel(task)
   const flag = task.flags.length === 0 ? '' : layout.flagMark ? '!' : truncate(flagText(task), layout.flagWidth)
   return {
-    priority: (task.priority === null ? '' : `P${task.priority}`).padEnd(PRIORITY_WIDTH),
+    priority: priorityText(task).padEnd(layout.priorityWidth),
     code: layout.codeWidth > 0 ? `${padDisplay(truncate(code, layout.codeWidth), layout.codeWidth)} ` : '',
     title: padDisplay(truncate(title, layout.titleWidth), layout.titleWidth),
     dots: stageDots(task),
