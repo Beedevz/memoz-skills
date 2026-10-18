@@ -64,7 +64,7 @@
       "id": "memoz-planning",
       "core": "core/planning.md",
       "title": "Memoz planning",
-      "description": "Break understood work into pieces that can be closed one at a time, each with a completion criterion you can actually run, plus the exclusions and the open questions. Use after the approach is settled and before implementing."
+      "description": "Plan understood work: one piece when it is small, pieces that can be closed one at a time when it really exceeds eight hours, each with a completion criterion you can actually run, plus the exclusions and the open questions. Use after the approach is settled and before implementing."
     },
     {
       "id": "memoz-parallel-work",
