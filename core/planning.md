@@ -1,15 +1,17 @@
 # Writing a plan
 
-Break work that is already understood into pieces that can be closed one at a time.
+Plan work that is already understood: as one piece when it is small, split into pieces that can be
+closed one at a time when it is large.
 
 Run this after the intent and the approach are settled — not before. Planning an ill-understood
 problem produces a confident list of the wrong steps.
 
 ## Split only work that is really large
 
-Split work only when it really takes more than **eight hours of real-world working time**. Below
-that it stays **one piece**: every split adds a card, a review and a merge, and on small work that
-overhead costs more than the split saves.
+Split work only when it really takes more than **eight hours of real-world working time** — the
+time a person would spend doing it, not an agent's run time. Below that it stays **one piece**,
+even when its parts could run in parallel: every split adds a card, a review and a merge, and on
+small work that overhead costs more than the split saves.
 
 When the work is that large, size each piece so that it is:
 
@@ -17,8 +19,8 @@ When the work is that large, size each piece so that it is:
 - **independently verifiable** — it produces something that can be shown to work on its own
 - **ordered by dependency**, with the ones that can run in parallel marked as such
 
-A piece that still exceeds the budget is split again; pieces that each take an hour or two are
-merged back. Count the pieces from the work, not from a target number.
+A piece that still exceeds the budget is split again. Small pieces are merged back only while the
+merged piece stays within the budget. Count the pieces from the work, not from a target number.
 
 ## Write criteria you can actually run
 
