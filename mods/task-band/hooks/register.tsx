@@ -15,7 +15,7 @@ import {
   rowAlt,
   rowCells,
   rowLayout,
-  utcDay,
+  localDay,
   type ParsedNote,
   type RunKind,
   type TaskTouchHistory,
@@ -136,7 +136,7 @@ async function readHistory($: EngineInterface, vault: string, secretsFolder: str
       try {
         events ??= parseHistoryFile(await $.fs.read(path))
       } catch {
-        events = [] // an unreadable file is skipped, as in the app
+        continue // unreadable now (a cloud drive may still be fetching it): skipped, NOT cached, read again on the next scan
       }
       next.set(path, { mtimeMs: file.mtimeMs, size: file.size, events })
     }
@@ -163,7 +163,7 @@ async function scan($: EngineInterface): Promise<BandSnapshot> {
 
   const { stalledDays, secretsFolder } = await readSettings($, vault)
   const history = await readHistory($, vault, secretsFolder)
-  const today = utcDay(await $.clock.now())
+  const today = localDay(await $.clock.now())
   const next = new Map<string, { mtimeMs: number; size: number; note: ParsedNote }>()
   const tasks: BandTask[] = []
   for (const file of await listNotes($, root, '')) {

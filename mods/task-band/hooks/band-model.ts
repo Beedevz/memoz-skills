@@ -145,6 +145,13 @@ export const daysBetween = (from: string, to: string): number =>
 /** The UTC day of a time in ms. UTC on purpose: it is the clock the Memoz app counts ages on. */
 export const utcDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10)
 
+/** The calendar day (`YYYY-MM-DD`) of an instant in the device's time zone. */
+export const localDay = (ms: number): string => {
+  const date = new Date(ms)
+  const two = (n: number): string => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`
+}
+
 // ── the Log section: the newest dated line ───────────────────────────────
 
 // ⚠️ A copy of the app's reader (`lastLogDate`), not an import: the band is a
@@ -346,7 +353,8 @@ const HISTORY_TOUCH_KEYS: ReadonlySet<string> = new Set(['status', 'stage', '~ch
 
 /**
  * The day of the newest event that is work on the task, `null` when there is none or the task
- * was deleted. A `backfill` event's day is its own stamp; any other event's time is a UTC day.
+ * was deleted. A `backfill` event's day is its own stamp; any other event's time is the LOCAL day
+ * of that instant, as in the app (an event at 01:30 on the 13th is the 13th, whatever its UTC date).
  */
 export const historyTouchDay = (history: TaskTouchHistory): string | null => {
   if (history.deleted === true) return null
@@ -357,7 +365,7 @@ export const historyTouchDay = (history: TaskTouchHistory): string | null => {
     return isValidDay(day) ? day : null
   }
   const time = Date.parse(last.t)
-  return Number.isNaN(time) ? null : utcDay(time)
+  return Number.isNaN(time) ? null : localDay(time)
 }
 
 /** The file name of a history file: `YYYY-MM.<kind>-<8 characters>.jsonl`. */

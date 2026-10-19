@@ -151,8 +151,10 @@ newest of the newest dated line (`- 2026-10-12 — …`) under a Log heading of 
 stamp and, when the vault records a change history in `.memoz/history/`, the day of the task's last
 `status`, `stage` or checkbox change (the note's file time only when it has none of these). A Log
 heading is a heading of any level whose text starts with `Log` or `Logs`; its deeper sub-headings
-belong to it, and it ends at the next heading of the same or a higher level. Dates are read as UTC days. `stalledDays` is read from the
-vault's `.memoz/settings.json` (a whole number of at least 1; default 2). Widths are counted in
+belong to it, and it ends at the next heading of the same or a higher level. Log and `start` dates
+are the days as written; "today" and the day of a history event are local calendar days (an event
+backfilled from a `start`/`done` stamp keeps the stamp's day); the note's file time, the fallback,
+is read as a UTC day. `stalledDays` is read from the vault's `.memoz/settings.json` (a whole number of at least 1; default 2). Widths are counted in
 terminal columns (CJK and emoji take two). On a narrow band the pieces go in this order: the flag
 text becomes a `!`, then the stage name goes (the dots stay), then the age, then the title shrinks.
 On a very narrow band the row no longer fits and runs past the edge; where that happens depends on

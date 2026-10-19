@@ -16,6 +16,7 @@ import {
   historyTouchDay,
   lastLogDate,
   lastTouch,
+  localDay,
   parseHistoryFile,
   parseNote,
   priorityText,
@@ -42,7 +43,8 @@ const TASKS = `${VAULT}/Tasks`
 const NOW = Date.parse('2026-10-15T12:00:00Z')
 const TODAY = '2026-10-15'
 
-type Fixture = Map<string, { text: string; mtimeMs: number }>
+// `fail`: reading the file throws (a file the drive has not fetched yet)
+type Fixture = Map<string, { text: string; mtimeMs: number; fail?: boolean }>
 
 const note = (frontmatter: string, body: string): string => `---\n${frontmatter}\n---\n${body}\n`
 
@@ -75,26 +77,31 @@ const fixtureFiles = (): Fixture =>
 
 // Answers the session's directory, HOME, the clock and the file system
 // from the fixture, and counts reads per path.
-const world = (on: On, files: Fixture) => {
+const world = (on: On, files: Fixture, now = NOW) => {
   const reads = new Map<string, number>()
   const isDir = (path: string) => [...files.keys()].some(file => file.startsWith(`${path}/`))
 
   mock.env(on, { HOME: '/home/u' })
-  const clock = mock.clock(on, { now: NOW })
+  const clock = mock.clock(on, { now })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: CWD }))
-  on('fs.exists', ($, e) => ({ value: files.has(e.path) || isDir(e.path) }))
+  // a real file system reads `Tasks//x.md` as `Tasks/x.md`
+  const clean = (path: string) => path.replaceAll(/\/{2,}/g, '/')
+  on('fs.exists', ($, e) => ({ value: files.has(clean(e.path)) || isDir(clean(e.path)) }))
   on('fs.read', ($, e) => {
-    const file = files.get(e.path)
+    const path = clean(e.path)
+    const file = files.get(path)
     if (!file) return { deny: `ENOENT: ${e.path}` }
-    reads.set(e.path, (reads.get(e.path) ?? 0) + 1)
+    reads.set(path, (reads.get(path) ?? 0) + 1)
+    if (file.fail) return { deny: `EIO: ${e.path}` }
     return { value: file.text }
   })
   on('fs.list', ($, e) => {
     const names = new Map<string, FsEntry>()
+    const dir = clean(e.path)
     for (const [path, file] of files) {
-      if (!path.startsWith(`${e.path}/`)) continue
-      const rest = path.slice(e.path.length + 1)
+      if (!path.startsWith(`${dir}/`)) continue
+      const rest = path.slice(dir.length + 1)
       const [name, ...deeper] = rest.split('/')
       const isFile = deeper.length === 0
       names.set(name!, {
@@ -501,6 +508,80 @@ for (const surface of ['terminal', 'desktop'] as const) {
       await ui.unmount()
     })
 
+    // `today` is the local day. alpha (ABC-1): Log 2026-10-14, start 2026-10-12, stalled at 2 days; delta is taken out.
+    const alphaOnly = (): Fixture => {
+      const files = fixtureFiles()
+      files.delete(`${TASKS}/ABC-4 — delta.md`)
+      return files
+    }
+
+    test('today is the local day: 00:30 on the 16th is the 16th, so alpha (last step the 14th) is stalled', OPTIONS, async ($, on) => {
+      const { clock } = world(on, alphaOnly(), localInstant(16, 0, 30))
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('today is the local day: 23:30 on the 15th is the 15th, so alpha (last step the 14th) is not stalled', OPTIONS, async ($, on) => {
+      const { clock } = world(on, alphaOnly(), localInstant(15, 23, 30))
+      await start($, clock)
+
+      const ui = await mount($)
+      const texts = await shownText(ui)
+      expect(texts).toContain('alpha')
+      expect(texts).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    // delta: last Log line the 10th. An event at 00:30 or 23:30 local on the 14th is the 14th, one day old on the 15th.
+    for (const [hour, minute] of [[0, 30], [23, 30]] as const) {
+      test(`a history event at ${hour}:${minute} local counts on its local day`, OPTIONS, async ($, on) => {
+        const { clock } = world(
+          on,
+          withHistory(event('e1', iso(localInstant(14, hour, minute)), DELTA, 'status', 'todo', 'doing')),
+          localInstant(15, 12, 0),
+        )
+        await start($, clock)
+
+        const ui = await mount($)
+        const texts = await shownText(ui)
+        expect(texts).not.toContain('stalled')
+        expect(texts).toContain(surface === 'desktop' ? 'last step 1d ago' : '1d ago')
+        await ui.unmount()
+      })
+    }
+
+    test('a history file whose read fails is skipped, not remembered: it is read again on the next refresh', OPTIONS, async ($, on) => {
+      const file = `${HISTORY}/2026-10.app-abcd1234.jsonl`
+      const files = withHistory(statusOfDelta('2026-10-14'))
+      const text = files.get(file)!.text
+      files.set(file, { text, mtimeMs: 10, fail: true })
+      const { clock } = world(on, files)
+      await start($, clock)
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+
+      files.set(file, { text, mtimeMs: 10 }) // same mtime and size: the drive has fetched it
+      await clock.advance(30_000)
+      expect(await shownText(ui)).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('a tasks folder declared with a trailing slash still finds the history', OPTIONS, async ($, on) => {
+      const files = withHistory(statusOfDelta('2026-10-14'))
+      files.set(`${CWD}/.memoz/tasks.json`, { text: '{"backend":"vault","vault":"V","folder":"Tasks/"}', mtimeMs: 1 })
+      const { clock } = world(on, files)
+      await start($, clock)
+
+      const ui = await mount($)
+      const texts = await shownText(ui)
+      expect(texts).toContain('delta')
+      expect(texts).not.toContain('stalled')
+      await ui.unmount()
+    })
+
     test('a history event shows as the last step, in days', OPTIONS, async ($, on) => {
       const { clock } = world(on, withHistory(statusOfDelta('2026-10-13')))
       await start($, clock)
@@ -628,11 +709,33 @@ test('historyTouchDay: only status, stage and ~checkboxes count; the last one de
   expect(historyTouchDay({ events: [] })).toBeNull()
 })
 
-test('historyTouchDay: a backfill event is its stamp day, any other event a UTC day', () => {
+test('historyTouchDay: a backfill event is its stamp day, an invalid one and a bad time are none', () => {
   expect(historyTouchDay({ events: [{ t: '2026-10-11T00:00:00.000Z', key: 'status', writer: 'backfill' }] })).toBe('2026-10-11')
   expect(historyTouchDay({ events: [{ t: '2026-02-30T00:00:00.000Z', key: 'status', writer: 'backfill' }] })).toBeNull()
-  expect(historyTouchDay({ events: [{ t: '2026-10-11T23:59:00.000Z', key: 'status', writer: 'app' }] })).toBe('2026-10-11')
   expect(historyTouchDay({ events: [{ t: 'garbage', key: 'status' }] })).toBeNull()
+})
+
+// ── local days ──
+// A mod test cannot change the device's time zone (no `process`), so these build the instant FROM local
+// clock parts: 01:30 and 23:30 on the 13th are, in any zone but UTC, on another UTC date (east of UTC the
+// early one, west of it the late one). The expected day is the local one by construction. Run the suite in two
+// zones: `TZ=Europe/Istanbul` and `TZ=America/New_York` (in UTC itself nothing here can tell local from UTC).
+const localInstant = (day: number, hour: number, minute: number, month = 10): number =>
+  new Date(2026, month - 1, day, hour, minute).getTime()
+const iso = (ms: number): string => new Date(ms).toISOString()
+
+test("historyTouchDay: an event's day is the local day of its time; a backfill stamp stays its own day", () => {
+  for (const [hour, minute] of [[0, 30], [1, 30], [12, 0], [22, 0], [23, 30]] as const) {
+    const t = iso(localInstant(13, hour, minute))
+    expect(historyTouchDay({ events: [{ t, key: 'status', writer: 'app' }] }), t).toBe('2026-10-13')
+  }
+  expect(historyTouchDay({ events: [{ t: '2026-10-11T00:00:00.000Z', key: 'status', writer: 'backfill' }] })).toBe('2026-10-11')
+})
+
+test('localDay: the calendar day of an instant in the device zone', () => {
+  expect(localDay(localInstant(16, 0, 30))).toBe('2026-10-16')
+  expect(localDay(localInstant(15, 23, 30))).toBe('2026-10-15')
+  expect(localDay(localInstant(1, 12, 0, 12))).toBe('2026-12-01')
 })
 
 test('a history file name is month, kind and an 8-character id', () => {
