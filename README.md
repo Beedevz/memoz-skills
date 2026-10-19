@@ -147,10 +147,11 @@ priority (`P1`), the task code and title, its **stage** (four dots and the name:
 (`today`, `3d ago`) and a **flag** when the record disagrees with the status: `stalled` (a `doing`
 task whose last step is `stalledDays` or more days old), `no stage` and `no branch` (a `doing` task
 without a `stage:` or `branch:`), `no MR` (a `review` task without an `mr:`). The last step is the
-newer of the newest dated line (`- 2026-10-12 — …`) under a Log heading of the note and its `start:`
-stamp (the note's file time only when it has neither). A Log heading is a heading of any level whose
-text starts with `Log` or `Logs`; its deeper sub-headings belong to it, and it ends at the next
-heading of the same or a higher level. Dates are read as UTC days. `stalledDays` is read from the
+newest of the newest dated line (`- 2026-10-12 — …`) under a Log heading of the note, its `start:`
+stamp and, when the vault records a change history in `.memoz/history/`, the day of the task's last
+`status`, `stage` or checkbox change (the note's file time only when it has none of these). A Log
+heading is a heading of any level whose text starts with `Log` or `Logs`; its deeper sub-headings
+belong to it, and it ends at the next heading of the same or a higher level. Dates are read as UTC days. `stalledDays` is read from the
 vault's `.memoz/settings.json` (a whole number of at least 1; default 2). Widths are counted in
 terminal columns (CJK and emoji take two). On a narrow band the pieces go in this order: the flag
 text becomes a `!`, then the stage name goes (the dots stay), then the age, then the title shrinks.

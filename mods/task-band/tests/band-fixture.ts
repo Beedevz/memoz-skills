@@ -1,4 +1,4 @@
-// Shared fixture for the task band's box counter, Log reader, frontmatter reader and last-touch rule: note texts with the expected result.
+// Shared fixture for the task band's box counter, Log reader, frontmatter reader and last-touch rule (with and without the task's change history): note texts with the expected result.
 //
 // SOURCE OF TRUTH: the memoz-skills repository, mods/task-band/tests/band-fixture.ts. The Memoz app keeps a
 // BYTE-IDENTICAL copy and runs its own box counter, Log reader, frontmatter reader and last-touch rule over it; the band's tests run over this
@@ -452,6 +452,426 @@ export default {
       "modifiedAt": "garbage",
       "today": "2026-10-13",
       "expected": null
+    }
+  ],
+  "historyCases": [
+    {
+      "name": "a status event newer than the Log line is the last touch",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-14T12:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-14",
+        "source": "history",
+        "ageDays": 1
+      }
+    },
+    {
+      "name": "a stage event counts",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-13T12:00:00.000Z",
+            "key": "stage",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-13",
+        "source": "history",
+        "ageDays": 2
+      }
+    },
+    {
+      "name": "a checkbox event counts",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-12T12:00:00.000Z",
+            "key": "~checkboxes",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-12",
+        "source": "history",
+        "ageDays": 3
+      }
+    },
+    {
+      "name": "other keys do not count: priority, a move, waived boxes, a title",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-14T12:00:00.000Z",
+            "key": "priority",
+            "writer": "app"
+          },
+          {
+            "t": "2026-10-14T13:00:00.000Z",
+            "key": "path",
+            "writer": "app"
+          },
+          {
+            "t": "2026-10-14T14:00:00.000Z",
+            "key": "~waived",
+            "writer": "app"
+          },
+          {
+            "t": "2026-10-14T15:00:00.000Z",
+            "key": "title",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-09",
+        "source": "log",
+        "ageDays": 6
+      }
+    },
+    {
+      "name": "a Log line of the same day wins over a history event",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-09T18:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-09",
+        "source": "log",
+        "ageDays": 6
+      }
+    },
+    {
+      "name": "a start stamp of the same day wins over a history event",
+      "note": "---\nstatus: doing\nstart: 2026-10-10\n---\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-10T18:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-10",
+        "source": "start",
+        "ageDays": 5
+      }
+    },
+    {
+      "name": "a history event older than the Log line does not lower it",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-05T12:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-09",
+        "source": "log",
+        "ageDays": 6
+      }
+    },
+    {
+      "name": "a history event older than the start stamp does not lower it",
+      "note": "---\nstatus: doing\nstart: 2026-10-10\n---\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-02T12:00:00.000Z",
+            "key": "stage",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-10",
+        "source": "start",
+        "ageDays": 5
+      }
+    },
+    {
+      "name": "a deleted task's history counts for nothing",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-14T12:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          }
+        ],
+        "deleted": true
+      },
+      "expected": {
+        "day": "2026-10-09",
+        "source": "log",
+        "ageDays": 6
+      }
+    },
+    {
+      "name": "a task that is not deleted is read as a live one",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-14T12:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          }
+        ],
+        "deleted": false
+      },
+      "expected": {
+        "day": "2026-10-14",
+        "source": "history",
+        "ageDays": 1
+      }
+    },
+    {
+      "name": "the last counting event decides, not a later event of another key",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-11T12:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          },
+          {
+            "t": "2026-10-14T12:00:00.000Z",
+            "key": "priority",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-11",
+        "source": "history",
+        "ageDays": 4
+      }
+    },
+    {
+      "name": "with several counting events the last one decides",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-11T12:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          },
+          {
+            "t": "2026-10-13T12:00:00.000Z",
+            "key": "~checkboxes",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-13",
+        "source": "history",
+        "ageDays": 2
+      }
+    },
+    {
+      "name": "a history event is the only source: the file time is not read",
+      "note": "---\nstatus: doing\n---\n",
+      "modifiedAt": "2026-10-14T08:00:00Z",
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-06T12:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-06",
+        "source": "history",
+        "ageDays": 9
+      }
+    },
+    {
+      "name": "a history event rescues a task that has no Log line and no start",
+      "note": "---\nstatus: doing\n---\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-14T12:00:00.000Z",
+            "key": "stage",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-14",
+        "source": "history",
+        "ageDays": 1
+      }
+    },
+    {
+      "name": "no counting event: the file time stays the fallback",
+      "note": "---\nstatus: doing\n---\n",
+      "modifiedAt": "2026-10-08T10:00:00Z",
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-14T12:00:00.000Z",
+            "key": "priority",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-08",
+        "source": "edited",
+        "ageDays": 7
+      }
+    },
+    {
+      "name": "a deleted task falls back to the file time like a task with no history",
+      "note": "---\nstatus: doing\n---\n",
+      "modifiedAt": "2026-10-08T10:00:00Z",
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-14T12:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          }
+        ],
+        "deleted": true
+      },
+      "expected": {
+        "day": "2026-10-08",
+        "source": "edited",
+        "ageDays": 7
+      }
+    },
+    {
+      "name": "no events at all: as without a history",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-09 — an old step\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": []
+      },
+      "expected": {
+        "day": "2026-10-09",
+        "source": "log",
+        "ageDays": 6
+      }
+    },
+    {
+      "name": "a backfill event is a day, not an instant: its own stamp is the day",
+      "note": "---\nstatus: doing\n---\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-11T00:00:00.000Z",
+            "key": "status",
+            "writer": "backfill"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-11",
+        "source": "history",
+        "ageDays": 4
+      }
+    },
+    {
+      "name": "an event time that is not a time is no source",
+      "note": "---\nstatus: doing\n---\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "garbage",
+            "key": "status",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": null
+    },
+    {
+      "name": "a start that is not a day does not hide a history event",
+      "note": "---\nstatus: doing\nstart: 2026-02-30\n---\n",
+      "modifiedAt": null,
+      "today": "2026-10-15",
+      "history": {
+        "events": [
+          {
+            "t": "2026-10-13T12:00:00.000Z",
+            "key": "status",
+            "writer": "app"
+          }
+        ]
+      },
+      "expected": {
+        "day": "2026-10-13",
+        "source": "history",
+        "ageDays": 2
+      }
     }
   ],
   "fieldCases": [

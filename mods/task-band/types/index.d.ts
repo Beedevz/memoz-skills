@@ -14,9 +14,9 @@ export type BandTask = {
   waived: number
   /** Every box: `[ ]`, `[x]` and `[~]` — the app's `n/m`. */
   total: number
-  /** `YYYY-MM-DD` of the last step: the newer of the last Log line and `start`, else the note's file time. */
+  /** `YYYY-MM-DD` of the last step: the newest of the last Log line, `start` and the task's last status / stage / checkbox change in the vault's history, else the note's file time. */
   lastDay: string | null
-  lastSource: 'log' | 'start' | 'edited' | null
+  lastSource: 'log' | 'start' | 'history' | 'edited' | null
   /** Whole days from `lastDay` to today (UTC); negative for a step dated in the future. */
   ageDays: number | null
   flags: BandFlag[]
