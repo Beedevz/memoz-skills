@@ -142,9 +142,6 @@ export const isValidDay = (value: string): boolean => {
 export const daysBetween = (from: string, to: string): number =>
   Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS)
 
-/** The UTC day of a time in ms. UTC on purpose: it is the clock the Memoz app counts ages on. */
-export const utcDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10)
-
 /** The calendar day (`YYYY-MM-DD`) of an instant in the device's time zone. */
 export const localDay = (ms: number): string => {
   const date = new Date(ms)
@@ -377,7 +374,14 @@ const CANONICAL_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 const isHistoryValue = (value: unknown): value is HistoryValue =>
   value === null || typeof value === 'string' || (Array.isArray(value) && value.every(item => typeof item === 'string'))
 
-/** One JSON line, or `null` when it is not a well-formed event (such a line is skipped, as in the app). */
+const nfc = (value: HistoryValue): HistoryValue =>
+  typeof value === 'string' ? value.normalize('NFC') : Array.isArray(value) ? value.map(item => item.normalize('NFC')) : value
+
+/**
+ * One JSON line, or `null` when it is not a well-formed event (such a line is skipped, as in the
+ * app). The `path` and the values are NFC: one task path recorded in two Unicode forms (a write
+ * and a reconcile of a decomposed file name) is one task, so its events must group together.
+ */
 const parseHistoryLine = (line: string): HistoryEvent | null => {
   try {
     const raw: unknown = JSON.parse(line)
@@ -387,7 +391,7 @@ const parseHistoryLine = (line: string): HistoryEvent | null => {
     if (typeof writer !== 'string' || !HISTORY_WRITERS.has(writer) || !isHistoryValue(old) || !isHistoryValue(next)) return null
     // Only the canonical time (`Date#toISOString()`): the sort is by text, so another form would land in the wrong place.
     if (!CANONICAL_TIME.test(t) || Number.isNaN(Date.parse(t)) || new Date(t).toISOString() !== t) return null
-    return { id, t, path, key, old, new: next, writer }
+    return { id, t, path: path.normalize('NFC'), key, old: nfc(old), new: nfc(next), writer }
   } catch {
     return null
   }
@@ -496,10 +500,12 @@ const groupFor = (byPath: ReadonlyMap<string, Group>, e: HistoryEvent, genuine: 
  * a restore clears the mark (only genuine `path` events: see `isPathEvent`); a field event at a deleted task's path is another task and starts a
  * fresh group. Every event of a task in the secrets folder is left out, and so is a move into or
  * out of it. `secretsFolder` is `folders.secrets` of the vault's settings; empty hides nothing.
+ * The keys are NFC.
  */
 export const groupHistory = (timeline: readonly HistoryEvent[], secretsFolder: string): Map<string, TaskTouchHistory> => {
+  const folder = secretsFolder.normalize('NFC') // paths are NFC (see `parseHistoryLine`)
   const isSecret = (value: HistoryValue): boolean =>
-    typeof value === 'string' && secretsFolder !== '' && (value === secretsFolder || value.startsWith(`${secretsFolder}/`))
+    typeof value === 'string' && folder !== '' && (value === folder || value.startsWith(`${folder}/`))
   const byPath = new Map<string, Group>()
   for (const e of runOrder(timeline)) {
     const genuine = isPathEvent(e)
@@ -521,7 +527,8 @@ export const groupHistory = (timeline: readonly HistoryEvent[], secretsFolder: s
 // newest history event that is work on it (`history`, when the vault has one); the note's
 // modification time only when it has none of these. (The same rule as the Memoz app.) A file
 // time is not part of the maximum: a sync that rewrites the file would otherwise reset the clock
-// of a task nobody touched. On the same day the Log line wins, then `start`.
+// of a task nobody touched. On the same day the Log line wins, then `start`. The file time and the
+// history events are instants, read as LOCAL days, like "today".
 export const lastTouch = (note: ParsedNote, mtimeMs: number, history?: TaskTouchHistory | null): LastTouch | null => {
   const candidates: LastTouch[] = [] // in tie order: the first of a day wins
   if (note.lastLog !== null) candidates.push({ day: note.lastLog, source: 'log' })
@@ -529,7 +536,7 @@ export const lastTouch = (note: ParsedNote, mtimeMs: number, history?: TaskTouch
   const touched = history ? historyTouchDay(history) : null
   if (touched !== null) candidates.push({ day: touched, source: 'history' })
   if (candidates.length === 0 && Number.isFinite(mtimeMs) && mtimeMs > 0) {
-    candidates.push({ day: utcDay(mtimeMs), source: 'edited' })
+    candidates.push({ day: localDay(mtimeMs), source: 'edited' })
   }
   let best: LastTouch | null = null
   for (const candidate of candidates) if (best === null || candidate.day > best.day) best = candidate

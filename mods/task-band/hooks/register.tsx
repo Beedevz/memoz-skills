@@ -115,7 +115,7 @@ async function readSettings($: EngineInterface, vault: string): Promise<VaultSet
   }
 }
 
-// The vault's task history (`.memoz/history/*.jsonl`) by the task's vault-relative path (NFC). Each
+// The vault's task history (`.memoz/history/*.jsonl`) by the task's vault-relative path (NFC, from the reader). Each
 // file is parsed again only when its mtime or size changed, and the whole is grouped again only when
 // some file changed. A vault with no history, or one that cannot be read, has none: the band then
 // behaves as it did before the history existed.
@@ -136,7 +136,10 @@ async function readHistory($: EngineInterface, vault: string, secretsFolder: str
       try {
         events ??= parseHistoryFile(await $.fs.read(path))
       } catch {
-        continue // unreadable now (a cloud drive may still be fetching it): skipped, NOT cached, read again on the next scan
+        // Unreadable now (a cloud drive may still be fetching it): keep what was read before, if
+        // anything, under its OLD mtime and size, so the file is read again on the next scan.
+        if (cached) next.set(path, cached)
+        continue
       }
       next.set(path, { mtimeMs: file.mtimeMs, size: file.size, events })
     }
@@ -144,7 +147,7 @@ async function readHistory($: EngineInterface, vault: string, secretsFolder: str
     const signature = JSON.stringify([secretsFolder, ...[...next].map(([path, file]) => [path, file.mtimeMs, file.size])])
     if (historyGroups?.signature !== signature) {
       const grouped = groupHistory(historyTimeline([...next.values()].map(file => file.events)), secretsFolder)
-      historyGroups = { signature, byPath: new Map([...grouped].map(([path, history]) => [path.normalize('NFC'), history])) }
+      historyGroups = { signature, byPath: grouped }
     }
     return historyGroups.byPath
   } catch {
@@ -172,7 +175,7 @@ async function scan($: EngineInterface): Promise<BandSnapshot> {
     const note = isFresh ? cached.note : parseNote(await $.fs.read(file.path))
     next.set(file.path, { mtimeMs: file.mtimeMs, size: file.size, note })
     if (note.status !== 'doing' && note.status !== 'review') continue
-    const taskPath = `${declaration.folder.replace(/^\/+|\/+$/g, '')}/${file.id}.md`.normalize('NFC')
+    const taskPath = `${declaration.folder.replace(/^(?:\.?\/)+|\/+$/g, '')}/${file.id}.md`.normalize('NFC')
     tasks.push(bandTask(file.id, note.status, note, file.mtimeMs, today, stalledDays, history.get(taskPath)))
   }
   cache = next

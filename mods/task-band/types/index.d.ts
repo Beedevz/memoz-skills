@@ -17,7 +17,7 @@ export type BandTask = {
   /** `YYYY-MM-DD` of the last step: the newest of the last Log line, `start` and the task's last status / stage / checkbox change in the vault's history, else the note's file time. */
   lastDay: string | null
   lastSource: 'log' | 'start' | 'history' | 'edited' | null
-  /** Whole days from `lastDay` to today (UTC); negative for a step dated in the future. */
+  /** Whole days from `lastDay` to today (the local day); negative for a step dated in the future. */
   ageDays: number | null
   flags: BandFlag[]
 }

@@ -85,8 +85,8 @@ const world = (on: On, files: Fixture, now = NOW) => {
   const clock = mock.clock(on, { now })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: CWD }))
-  // a real file system reads `Tasks//x.md` as `Tasks/x.md`
-  const clean = (path: string) => path.replaceAll(/\/{2,}/g, '/')
+  // a real file system reads `Tasks//x.md` and `./Tasks/x.md` as `Tasks/x.md`
+  const clean = (path: string) => path.replaceAll(/\/(?:\.?\/)+/g, '/')
   on('fs.exists', ($, e) => ({ value: files.has(clean(e.path)) || isDir(clean(e.path)) }))
   on('fs.read', ($, e) => {
     const path = clean(e.path)
@@ -494,6 +494,25 @@ for (const surface of ['terminal', 'desktop'] as const) {
       })
     }
 
+    test('events of one task path in two Unicode forms are all counted (the NFD ones are not a second task)', OPTIONS, async ($, on) => {
+      const files = withHistory(
+        event('e1', T('2026-10-10'), 'Tasks/ABC-4 — d\u00e9lta.md', 'status', 'todo', 'doing'),
+        event('e2', T('2026-10-12'), 'Tasks/ABC-4 — de\u0301lta.md', 'stage', null, 'implementing'),
+        event('e3', T('2026-10-14'), 'Tasks/ABC-4 — d\u00e9lta.md', '~checkboxes', '0/1', '1/1'),
+      )
+      files.delete(`${TASKS}/ABC-4 — delta.md`)
+      files.set(`${TASKS}/ABC-4 — d\u00e9lta.md`, {
+        text: note('status: doing\npriority: 3', '- [x] a\n## Log\n- 2026-10-10 — old step'),
+        mtimeMs: 1,
+      })
+      const { clock } = world(on, files)
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+      await ui.unmount()
+    })
+
     test('a settings file without a secrets folder leaves the default, Secrets', OPTIONS, async ($, on) => {
       const files = withHistory(statusOfDelta('2026-10-14'))
       files.set(`${VAULT}/.memoz/settings.json`, { text: '{"stalledDays": 2, "folders": {"daily": "Daily"}}', mtimeMs: 1 })
@@ -585,6 +604,25 @@ for (const surface of ['terminal', 'desktop'] as const) {
       await ui.unmount()
     })
 
+    test('a history file that cannot be read after it was read keeps what was read before, and is read again', OPTIONS, async ($, on) => {
+      const file = `${HISTORY}/2026-10.app-abcd1234.jsonl`
+      const files = withHistory(statusOfDelta('2026-10-14'))
+      const { clock, reads } = world(on, files)
+      await start($, clock)
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+
+      files.set(file, { text: jsonl(statusOfDelta('2026-10-01')), mtimeMs: 11, fail: true }) // changed, and the drive has not fetched it
+      await clock.advance(30_000)
+      expect(await shownText(ui)).not.toContain('stalled')
+
+      files.set(file, { text: jsonl(statusOfDelta('2026-10-01')), mtimeMs: 11 }) // fetched: the new content is read
+      await clock.advance(30_000)
+      expect(reads.get(file)).toBe(3)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
     test('a tasks folder declared with a trailing slash still finds the history', OPTIONS, async ($, on) => {
       const files = withHistory(statusOfDelta('2026-10-14'))
       files.set(`${CWD}/.memoz/tasks.json`, { text: '{"backend":"vault","vault":"V","folder":"Tasks/"}', mtimeMs: 1 })
@@ -597,6 +635,21 @@ for (const surface of ['terminal', 'desktop'] as const) {
       expect(texts).not.toContain('stalled')
       await ui.unmount()
     })
+
+    for (const folder of ['./Tasks', './/Tasks/', '/Tasks']) {
+      test(`a tasks folder declared as ${folder} still finds the history`, OPTIONS, async ($, on) => {
+        const files = withHistory(statusOfDelta('2026-10-14'))
+        files.set(`${CWD}/.memoz/tasks.json`, { text: JSON.stringify({ backend: 'vault', vault: 'V', folder }), mtimeMs: 1 })
+        const { clock } = world(on, files)
+        await start($, clock)
+
+        const ui = await mount($)
+        const texts = await shownText(ui)
+        expect(texts).toContain('delta')
+        expect(texts).not.toContain('stalled')
+        await ui.unmount()
+      })
+    }
 
     test('a history event shows as the last step, in days', OPTIONS, async ($, on) => {
       const { clock } = world(on, withHistory(statusOfDelta('2026-10-13')))
@@ -637,12 +690,15 @@ test('a vault declared by absolute path needs no vaultsDir', async ($, on) => {
 
 // ── the shared fixture: the band counts boxes and reads the Log the way the app does ──
 
+const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
 describe('shared fixture (tests/band-fixture.ts, the Memoz app keeps a copy)', () => {
   test('has cases to run', () => {
     expect(fixture.boxCases.length).toBeGreaterThan(0)
     expect(fixture.logCases.length).toBeGreaterThan(0)
     expect(fixture.touchCases.length).toBeGreaterThan(0)
     expect(fixture.historyCases.length).toBeGreaterThan(0)
+    expect(fixture.timelineCases.length).toBeGreaterThan(0)
     expect(fixture.fieldCases.length).toBeGreaterThan(0)
   })
 
@@ -672,7 +728,11 @@ describe('shared fixture (tests/band-fixture.ts, the Memoz app keeps a copy)', (
     })
   }
 
-  for (const { name, note: text, modifiedAt, today, expected } of fixture.touchCases) {
+  // A mod test cannot set the time zone (no `process`): a case with a `zone` runs when the device is in
+  // that zone, so the suite is run in each zone it names (TZ=Europe/Istanbul, TZ=America/New_York).
+  const here = (zone: string | undefined): boolean => zone === undefined || zone === deviceZone
+
+  for (const { name, note: text, modifiedAt, today, expected } of fixture.touchCases.filter(c => here(c.zone))) {
     test(`last touch: ${name}`, () => {
       const touch = lastTouch(parseNote(text), modifiedAt === null ? 0 : Date.parse(modifiedAt))
       const got = touch && { day: touch.day, source: touch.source, ageDays: daysBetween(touch.day, today) }
@@ -680,11 +740,20 @@ describe('shared fixture (tests/band-fixture.ts, the Memoz app keeps a copy)', (
     })
   }
 
-  for (const { name, note: text, modifiedAt, today, history, expected } of fixture.historyCases) {
+  for (const { name, note: text, modifiedAt, today, history, expected } of fixture.historyCases.filter(c => here(c.zone))) {
     test(`last touch with history: ${name}`, () => {
       const touch = lastTouch(parseNote(text), modifiedAt === null ? 0 : Date.parse(modifiedAt), history)
       const got = touch && { day: touch.day, source: touch.source, ageDays: daysBetween(touch.day, today) }
       expect(got ?? null).toEqual(expected)
+    })
+  }
+
+  // Raw events of the history files in, per task path { touchDay, deleted } out: the app's reader is held to the same cases.
+  for (const { name, files, secretsFolder, expected } of fixture.timelineCases.filter(c => here(c.zone))) {
+    test(`history reader: ${name}`, () => {
+      const groups = groupHistory(historyTimeline(files.map(file => parseHistoryFile(jsonl(...file)))), secretsFolder ?? 'Secrets')
+      const got = Object.fromEntries([...groups].map(([path, task]) => [path, { touchDay: historyTouchDay(task), deleted: task.deleted === true }]))
+      expect(got).toEqual(expected)
     })
   }
 })
@@ -1034,6 +1103,44 @@ test('grouping: an empty secrets folder hides nothing', () => {
 
 test('grouping: the secrets folder itself is a secrets path', () => {
   expect(grouped([event('1', T('2026-10-01'), 'Secrets', 'status', 'todo', 'doing')]).size).toBe(0)
+})
+
+// One task path recorded in two Unicode forms (NFC by a write, NFD by a reconcile of a file name a
+// drive or an OS decomposed) is ONE task: the events are merged when they are read.
+const NFC_PATH = 'Tasks/\u00e9.md'
+const NFD_PATH = 'Tasks/e\u0301.md'
+
+test('grouping: one task path in two Unicode forms is one group, whatever the order of the events', () => {
+  const groups = grouped([
+    event('1', T('2026-10-10'), NFC_PATH, 'status', 'todo', 'doing'),
+    event('2', T('2026-10-12'), NFD_PATH, 'stage', null, 'implementing'),
+    event('3', T('2026-10-14'), NFC_PATH, '~checkboxes', '0/1', '1/1'),
+  ])
+  expect([...groups.keys()]).toEqual([NFC_PATH])
+  expect(keysOf(groups.get(NFC_PATH)?.events)).toEqual(['status', 'stage', '~checkboxes'])
+  expect(historyTouchDay(groups.get(NFC_PATH)!)).toBe('2026-10-14')
+})
+
+test('reading: path, old and new of an event are NFC; a move between two forms is a move, not a new path', () => {
+  const [moved, listed] = parseHistoryFile(
+    jsonl(
+      event('1', T('2026-10-10'), NFD_PATH, 'path', 'Tasks/a.md', NFD_PATH),
+      event('2', T('2026-10-11'), NFD_PATH, 'branch', ['e\u0301', 'x'], 'e\u0301'),
+    ),
+  )
+  expect([moved!.path, moved!.new]).toEqual([NFC_PATH, NFC_PATH])
+  expect([listed!.path, listed!.old, listed!.new]).toEqual([NFC_PATH, ['\u00e9', 'x'], '\u00e9'])
+  const groups = grouped([
+    event('0', T('2026-10-09'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('1', T('2026-10-10'), NFD_PATH, 'path', 'Tasks/a.md', NFD_PATH),
+  ])
+  expect([...groups.keys()]).toEqual([NFC_PATH])
+  expect(groups.get(NFC_PATH)?.deleted).toBe(false)
+})
+
+test('grouping: a secrets folder written in another Unicode form still hides its tasks', () => {
+  const folder = 'S\u00e9crets'
+  expect(grouped([event('1', T('2026-10-01'), 'Se\u0301crets/s.md', 'status', 'todo', 'doing')], folder).size).toBe(0)
 })
 
 // ── reading a note ───────────────────────────────────────────────────────
