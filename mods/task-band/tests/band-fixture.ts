@@ -397,30 +397,6 @@ export default {
       }
     },
     {
-      "name": "the file time is a local day: 01:30 on the 13th east of UTC (the UTC day is the 12th)",
-      "zone": "Europe/Istanbul",
-      "note": "---\nstatus: doing\n---\n",
-      "modifiedAt": "2026-10-12T22:30:00.000Z",
-      "today": "2026-10-14",
-      "expected": {
-        "day": "2026-10-13",
-        "source": "edited",
-        "ageDays": 1
-      }
-    },
-    {
-      "name": "the file time is a local day: 21:30 on the 13th west of UTC (the UTC day is the 14th)",
-      "zone": "America/New_York",
-      "note": "---\nstatus: doing\n---\n",
-      "modifiedAt": "2026-10-14T01:30:00.000Z",
-      "today": "2026-10-15",
-      "expected": {
-        "day": "2026-10-13",
-        "source": "edited",
-        "ageDays": 2
-      }
-    },
-    {
       "name": "a file time newer than the Log line does not count",
       "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-05 — x\n",
       "modifiedAt": "2026-10-12T08:00:00Z",
@@ -850,6 +826,36 @@ export default {
         "day": "2026-10-13",
         "source": "history",
         "ageDays": 1
+      }
+    },
+    {
+      "name": "with no event the file time is a local day: 01:30 on the 13th east of UTC (the UTC day is the 12th)",
+      "zone": "Europe/Istanbul",
+      "note": "---\nstatus: doing\n---\n",
+      "modifiedAt": "2026-10-12T22:30:00.000Z",
+      "today": "2026-10-14",
+      "history": {
+        "events": []
+      },
+      "expected": {
+        "day": "2026-10-13",
+        "source": "edited",
+        "ageDays": 1
+      }
+    },
+    {
+      "name": "with no event the file time is a local day: 21:30 on the 13th west of UTC (the UTC day is the 14th)",
+      "zone": "America/New_York",
+      "note": "---\nstatus: doing\n---\n",
+      "modifiedAt": "2026-10-14T01:30:00.000Z",
+      "today": "2026-10-15",
+      "history": {
+        "events": []
+      },
+      "expected": {
+        "day": "2026-10-13",
+        "source": "edited",
+        "ageDays": 2
       }
     },
     {
