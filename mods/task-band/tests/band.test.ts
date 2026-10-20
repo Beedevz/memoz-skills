@@ -407,6 +407,22 @@ for (const surface of ['terminal', 'desktop'] as const) {
       await ui.unmount()
     })
 
+    test("a user's own `path:` field written by an older writer neither moves nor deletes the task", OPTIONS, async ($, on) => {
+      const { clock } = world(
+        on,
+        withHistory(
+          statusOfDelta('2026-10-14'),
+          event('e2', T('2026-10-14', '13:00:00'), DELTA, 'path', 'a/b', null),
+          event('e3', T('2026-10-14', '14:00:00'), DELTA, 'path', 'c/d', 'e/f'),
+        ),
+      )
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+      await ui.unmount()
+    })
+
     test('the history of a deleted task counts for nothing', OPTIONS, async ($, on) => {
       const { clock } = world(
         on,
@@ -833,6 +849,97 @@ test('grouping: a delete marks the task, a restore clears the mark and keeps its
   const restored = grouped([...events, event('3', T('2026-10-13'), 'Tasks/a.md', 'path', null, 'Tasks/a.md')]).get('Tasks/a.md')
   expect(restored?.deleted).toBe(false)
   expect(historyTouchDay(restored!)).toBe('2026-10-10')
+})
+
+test('grouping: a user\'s own `path:` field recorded by an older writer (key path, the note\'s own path) is a field change, not a move', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'old/value', 'new/value'), // not a move: the path is the note's own
+  ])
+  expect([...group.keys()]).toEqual(['Tasks/a.md'])
+  expect(keysOf(group.get('Tasks/a.md')?.events)).toEqual(['status', 'path'])
+  expect(group.get('Tasks/a.md')?.deleted).toBe(false)
+  expect(historyTouchDay(group.get('Tasks/a.md')!)).toBe('2026-10-10')
+})
+
+test('grouping: a user\'s `path:` field whose old value names the secrets folder is still a field change', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'Secrets/z', 'elsewhere'),
+  ]).get('Tasks/a.md')
+  expect(group?.events.map(e => e.id)).toEqual(['1', '2'])
+})
+
+test('grouping: removing the user\'s `path:` field (new null, the note\'s own path) is not a delete', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'old/value', null),
+  ]).get('Tasks/a.md')
+  expect(group?.deleted).toBe(false)
+  expect(keysOf(group?.events)).toEqual(['status', 'path'])
+  expect(historyTouchDay(group!)).toBe('2026-10-10')
+})
+
+test('grouping: a user\'s `path:` field event at a deleted task\'s path is another task and starts a fresh group', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'Tasks/a.md', null), // deleted
+    event('3', T('2026-10-12'), 'Tasks/a.md', 'path', 'x', 'y'), // a user field on a task created there
+  ]).get('Tasks/a.md')
+  expect(group?.events.map(e => e.id)).toEqual(['3'])
+  expect(group?.deleted).toBe(false)
+})
+
+test('grouping: the same shapes are genuine when the path is the new (move, restore) or the old (delete) path', () => {
+  const moved = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/b.md', 'path', 'Tasks/a.md', 'Tasks/b.md'),
+  ])
+  expect([...moved.keys()]).toEqual(['Tasks/b.md'])
+  const deleted = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'Tasks/a.md', null),
+  ])
+  expect(deleted.get('Tasks/a.md')?.deleted).toBe(true)
+})
+
+test('grouping: a user\'s `path:` field event stays a field event beside a real move of the same time', () => {
+  const t = T('2026-10-14')
+  // the user field event and a real move share a time; the field event stays a field event (before the move)
+  const events = [
+    event('1', T('2026-10-10'), 'Tasks/x.md', 'status', 'todo', 'doing'),
+    event('2', t, 'Tasks/x.md', 'path', 'one', 'two'),
+    event('3', t, 'Archive/x.md', 'path', 'Tasks/x.md', 'Archive/x.md'),
+  ]
+  const groups = grouped(events)
+  expect([...groups.keys()]).toEqual(['Archive/x.md'])
+  expect(keysOf(groups.get('Archive/x.md')?.events)).toEqual(['status', 'path', 'path'])
+  expect(groups.get('Archive/x.md')?.events.map(e => e.id)).toEqual(['1', '2', '3'])
+})
+
+test('grouping: an escaped user key (`~key:path`) is a plain field change', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', '~key:path', 'x', 'y'),
+    event('3', T('2026-10-12'), 'Tasks/a.md', '~key:path', 'y', null),
+  ]).get('Tasks/a.md')
+  expect(group?.deleted).toBe(false)
+  expect(keysOf(group?.events)).toEqual(['status', '~key:path', '~key:path'])
+  expect(historyTouchDay(group!)).toBe('2026-10-10') // a user field is not work on the task
+  // even a value that looks like a delete (the note's own path as old, new null) is a field change under the escaped key
+  const lookalike = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', '~key:path', 'Tasks/a.md', null),
+  ]).get('Tasks/a.md')
+  expect(lookalike?.deleted).toBe(false)
+  // and after a delete it is a field event at a deleted task's path: another task, a fresh group
+  const fresh = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'Tasks/a.md', null),
+    event('3', T('2026-10-12'), 'Tasks/a.md', '~key:path', 'x', 'y'),
+  ]).get('Tasks/a.md')
+  expect(fresh?.events.map(e => e.id)).toEqual(['3'])
+  expect(fresh?.deleted).toBe(false)
 })
 
 test('grouping: a field event at a deleted task\'s path is another task and starts a fresh group', () => {

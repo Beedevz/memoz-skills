@@ -443,8 +443,16 @@ export const historyTimeline = (files: readonly (readonly HistoryEvent[])[]): Hi
   return foldTimeline([...byId.values()].sort(byTimeline))
 }
 
+// Is this a genuine `path` event (a move, a delete or a restore)? The key alone is not enough: a
+// writer that does not escape a user's own frontmatter key `path:` records it as `key: 'path'` too
+// (newer writers record it as `~key:path`, a plain field). The writer of a genuine event sets
+// `path = new ?? old`, the note's path after the change (the path it had, for a delete); a user
+// field event carries the note's own path and unrelated values. Anything else is a field change.
+const isPathEvent = (e: HistoryEvent): boolean => e.key === 'path' && e.path === (e.new ?? e.old)
+
 type Move = HistoryEvent & { old: string; new: string }
-const isMove = (e: HistoryEvent): e is Move => e.key === 'path' && typeof e.old === 'string' && typeof e.new === 'string'
+const isMove = (e: HistoryEvent, genuine: boolean): e is Move =>
+  genuine && typeof e.old === 'string' && typeof e.new === 'string'
 
 /** Equal-time moves in chain order (a move whose `old` is another pending move's `new` waits); a cycle keeps the given order. */
 const chainOrder = (moves: readonly HistoryEvent[]): HistoryEvent[] => {
@@ -466,8 +474,8 @@ const runOrder = (events: readonly HistoryEvent[]): HistoryEvent[] => {
     const first = events[start] as HistoryEvent
     if (end < events.length && (events[end] as HistoryEvent).t === first.t) continue
     const run = events.slice(start, end)
-    for (const e of run) if (e.key !== 'path') ordered.push(e)
-    ordered.push(...chainOrder(run.filter(e => e.key === 'path')))
+    for (const e of run) if (!isPathEvent(e)) ordered.push(e)
+    ordered.push(...chainOrder(run.filter(isPathEvent)))
     start = end
   }
   return ordered
@@ -476,16 +484,16 @@ const runOrder = (events: readonly HistoryEvent[]): HistoryEvent[] => {
 type Group = { events: HistoryEvent[]; deleted: boolean }
 
 /** The group an event joins: the moved task's, a fresh one at a deleted task's path, or the path's own. */
-const groupFor = (byPath: ReadonlyMap<string, Group>, e: HistoryEvent): Group => {
-  if (isMove(e)) return byPath.get(e.old) ?? { events: [], deleted: false }
+const groupFor = (byPath: ReadonlyMap<string, Group>, e: HistoryEvent, genuine: boolean): Group => {
+  if (isMove(e, genuine)) return byPath.get(e.old) ?? { events: [], deleted: false }
   const kept = byPath.get(e.path)
-  return kept === undefined || (kept.deleted && e.key !== 'path') ? { events: [], deleted: false } : kept
+  return kept === undefined || (kept.deleted && !genuine) ? { events: [], deleted: false } : kept
 }
 
 /**
  * Groups a timeline by the task's CURRENT path (vault-relative). A move carries the task's earlier
  * events along and replaces whatever group the destination had; a delete marks the task deleted,
- * a restore clears the mark; a field event at a deleted task's path is another task and starts a
+ * a restore clears the mark (only genuine `path` events: see `isPathEvent`); a field event at a deleted task's path is another task and starts a
  * fresh group. Every event of a task in the secrets folder is left out, and so is a move into or
  * out of it. `secretsFolder` is `folders.secrets` of the vault's settings; empty hides nothing.
  */
@@ -494,14 +502,15 @@ export const groupHistory = (timeline: readonly HistoryEvent[], secretsFolder: s
     typeof value === 'string' && secretsFolder !== '' && (value === secretsFolder || value.startsWith(`${secretsFolder}/`))
   const byPath = new Map<string, Group>()
   for (const e of runOrder(timeline)) {
-    const task = groupFor(byPath, e)
-    if (isMove(e)) byPath.delete(e.old)
+    const genuine = isPathEvent(e)
+    const task = groupFor(byPath, e, genuine)
+    if (isMove(e, genuine)) byPath.delete(e.old)
     if (isSecret(e.path)) continue
-    if (e.key === 'path' && isSecret(e.old)) {
+    if (genuine && isSecret(e.old)) {
       byPath.delete(e.path) // a move out of the folder still replaces the group the destination had
       continue
     }
-    if (e.key === 'path') task.deleted = e.new === null
+    if (genuine) task.deleted = e.new === null
     task.events.push(e)
     byPath.set(e.path, task)
   }
