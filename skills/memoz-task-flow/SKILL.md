@@ -197,7 +197,11 @@ band and the next session all read it. Its layout, in this order:
 6. **Log** — a level-2 heading `## Log`, holding one dated line per checkpoint
    (`YYYY-MM-DD — …`, §5), newest last. One line each, not a paragraph. Keep the heading exactly
    `## Log`: tooling reads the last dated line under a heading that starts with `Log` to tell
-   whether a task has stalled, and a dated line anywhere else is not seen.
+   whether a task has stalled, and a dated line anywhere else is not seen. The last touch is the
+   newest of three sources: that Log line, the `start` stamp, and — where the vault records a
+   change history (`.memoz/history/`) — a recent change of the task's `status`, `stage` or
+   checkboxes (`~checkboxes`). So a task that is moving but has no new Log line is not called
+   stalled; the Log line is still the record of what was done.
 
 Why the task exists, its scope and what it changes do not fit in a goal line: they go to a
 **brief**. Choices made while working the task go to **task decisions**; what the work reports

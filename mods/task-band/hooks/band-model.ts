@@ -142,8 +142,12 @@ export const isValidDay = (value: string): boolean => {
 export const daysBetween = (from: string, to: string): number =>
   Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS)
 
-/** The UTC day of a time in ms. UTC on purpose: it is the clock the Memoz app counts ages on. */
-export const utcDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10)
+/** The calendar day (`YYYY-MM-DD`) of an instant in the device's time zone. */
+export const localDay = (ms: number): string => {
+  const date = new Date(ms)
+  const two = (n: number): string => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`
+}
 
 // ── the Log section: the newest dated line ───────────────────────────────
 
@@ -309,19 +313,230 @@ export const parseNote = (text: string): ParsedNote => {
 export const resolveStalledDays = (value: unknown): number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : DEFAULT_STALLED_DAYS
 
-export type LastTouch = { day: string; source: 'log' | 'start' | 'edited' }
+export type LastTouch = { day: string; source: 'log' | 'start' | 'history' | 'edited' }
 
-// The last step of a task: the newer of its last Log line and its `start`
-// stamp; the note's modification time only when it has neither. (The same rule
-// as the Memoz app.) A file time is not part of the maximum: a sync
-// that rewrites the file would otherwise reset the clock of a task nobody
-// touched.
-export const lastTouch = (note: ParsedNote, mtimeMs: number): LastTouch | null => {
-  const candidates: LastTouch[] = []
+// ── the task's change history ───────────────────────────────────────────
+
+// ⚠️ A copy of the app's history reader, not an import (see `lastLogDate`). The app records one
+// event per changed frontmatter key of a task in `.memoz/history/YYYY-MM.<writer>.jsonl`. A
+// history event that is work on a task counts as a touch, so the band and the app agree on which
+// task has stalled. The reader below follows the app's: one event per id, in time order, minus
+// the repeats an observer or a guess adds; grouped by the task's CURRENT path.
+
+/** A field's value in an event: one string, a list, or `null` when the key is absent. */
+type HistoryValue = string | string[] | null
+
+type HistoryEvent = {
+  id: string
+  /** ISO 8601 with milliseconds; for a `backfill` event the day (UTC midnight) of a stamp. */
+  t: string
+  /** The note's path after the change (for a delete: the path it had). */
+  path: string
+  /** A frontmatter key, a derived `~` key, or `path` for a move, a delete (`new: null`) or a restore (`old: null`). */
+  key: string
+  old: HistoryValue
+  new: HistoryValue
+  writer: string
+}
+
+/** What the last-touch rule reads of one history event. */
+export type TouchEvent = { t: string; key: string; writer?: string }
+
+/** One task's history for the last-touch rule: its events IN TIME ORDER, and whether the task was deleted. */
+export type TaskTouchHistory = { events: readonly TouchEvent[]; deleted?: boolean }
+
+/** The history keys that are work on a task: a status, a stage or a checkbox change. Nothing else resets the clock. */
+const HISTORY_TOUCH_KEYS: ReadonlySet<string> = new Set(['status', 'stage', '~checkboxes'])
+
+/**
+ * The day of the newest event that is work on the task, `null` when there is none or the task
+ * was deleted. A `backfill` event's day is its own stamp; any other event's time is the LOCAL day
+ * of that instant, as in the app (an event at 01:30 on the 13th is the 13th, whatever its UTC date).
+ */
+export const historyTouchDay = (history: TaskTouchHistory): string | null => {
+  if (history.deleted === true) return null
+  const last = history.events.findLast(event => HISTORY_TOUCH_KEYS.has(event.key))
+  if (last === undefined) return null
+  if (last.writer === 'backfill') {
+    const day = last.t.slice(0, 10)
+    return isValidDay(day) ? day : null
+  }
+  const time = Date.parse(last.t)
+  return Number.isNaN(time) ? null : localDay(time)
+}
+
+/** The file name of a history file: `YYYY-MM.<kind>-<8 characters>.jsonl`. */
+export const HISTORY_FILE = /^\d{4}-\d{2}\.[a-z]+-[0-9a-z]{8}\.jsonl$/
+
+const HISTORY_WRITERS: ReadonlySet<string> = new Set(['app', 'mcp', 'cli', 'external', 'backfill'])
+const CANONICAL_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+
+const isHistoryValue = (value: unknown): value is HistoryValue =>
+  value === null || typeof value === 'string' || (Array.isArray(value) && value.every(item => typeof item === 'string'))
+
+const nfc = (value: HistoryValue): HistoryValue =>
+  typeof value === 'string' ? value.normalize('NFC') : Array.isArray(value) ? value.map(item => item.normalize('NFC')) : value
+
+/**
+ * One JSON line, or `null` when it is not a well-formed event (such a line is skipped, as in the
+ * app). The `path` and the values are NFC: one task path recorded in two Unicode forms (a write
+ * and a reconcile of a decomposed file name) is one task, so its events must group together.
+ */
+const parseHistoryLine = (line: string): HistoryEvent | null => {
+  try {
+    const raw: unknown = JSON.parse(line)
+    if (typeof raw !== 'object' || raw === null) return null
+    const { id, t, path, key, old, new: next, writer } = raw as Record<string, unknown>
+    if (typeof id !== 'string' || typeof t !== 'string' || typeof path !== 'string' || typeof key !== 'string') return null
+    if (typeof writer !== 'string' || !HISTORY_WRITERS.has(writer) || !isHistoryValue(old) || !isHistoryValue(next)) return null
+    // Only the canonical time (`Date#toISOString()`): the sort is by text, so another form would land in the wrong place.
+    if (!CANONICAL_TIME.test(t) || Number.isNaN(Date.parse(t)) || new Date(t).toISOString() !== t) return null
+    return { id, t, path: path.normalize('NFC'), key, old: nfc(old), new: nfc(next), writer }
+  } catch {
+    return null
+  }
+}
+
+/** Every well-formed event of one history file's text. */
+export const parseHistoryFile = (text: string): HistoryEvent[] =>
+  text.split('\n').flatMap(line => parseHistoryLine(line) ?? [])
+
+/** Who knew best: the process that made the change, then an observer, then the backfill. */
+const writerRank = (writer: string): number => (writer === 'external' ? 1 : writer === 'backfill' ? 2 : 0)
+
+const compareText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
+/** By time; at an equal time the writer's own event before an observer's, then by path, key and id. */
+const byTimeline = (a: HistoryEvent, b: HistoryEvent): number =>
+  compareText(a.t, b.t) ||
+  writerRank(a.writer) - writerRank(b.writer) ||
+  compareText(a.path, b.path) ||
+  compareText(a.key, b.key) ||
+  compareText(a.id, b.id)
+
+/**
+ * Drops the events that add no step: a `backfill` event (a guess from a stamp) where a real
+ * event reached the same value for that path and key, and an `external` event whose value the
+ * events before it already reached (an observer that was several states behind sees only the
+ * net change, or re-records an old one at the time of a later edit).
+ */
+const foldTimeline = (ordered: readonly HistoryEvent[]): HistoryEvent[] => {
+  const slotOf = (e: HistoryEvent): string => JSON.stringify([e.path, e.key])
+  const real = new Set(ordered.filter(e => e.writer !== 'backfill').map(e => JSON.stringify([slotOf(e), e.new])))
+  const reached = new Map<string, string>()
+  const out: HistoryEvent[] = []
+  for (const e of ordered) {
+    if (e.writer === 'backfill' && real.has(JSON.stringify([slotOf(e), e.new]))) continue
+    const value = JSON.stringify(e.new)
+    if (e.writer === 'external' && reached.get(slotOf(e)) === value) continue
+    reached.set(slotOf(e), value)
+    out.push(e)
+  }
+  return out
+}
+
+/** The events of every history file: one per id (the best writer's), in time order, folded. */
+export const historyTimeline = (files: readonly (readonly HistoryEvent[])[]): HistoryEvent[] => {
+  const byId = new Map<string, HistoryEvent>()
+  for (const file of files) {
+    for (const e of file) {
+      const kept = byId.get(e.id)
+      if (kept === undefined || writerRank(e.writer) < writerRank(kept.writer)) byId.set(e.id, e)
+    }
+  }
+  return foldTimeline([...byId.values()].sort(byTimeline))
+}
+
+// Is this a genuine `path` event (a move, a delete or a restore)? The key alone is not enough: a
+// writer that does not escape a user's own frontmatter key `path:` records it as `key: 'path'` too
+// (newer writers record it as `~key:path`, a plain field). The writer of a genuine event sets
+// `path = new ?? old`, the note's path after the change (the path it had, for a delete); a user
+// field event carries the note's own path and unrelated values. Anything else is a field change.
+const isPathEvent = (e: HistoryEvent): boolean => e.key === 'path' && e.path === (e.new ?? e.old)
+
+type Move = HistoryEvent & { old: string; new: string }
+const isMove = (e: HistoryEvent, genuine: boolean): e is Move =>
+  genuine && typeof e.old === 'string' && typeof e.new === 'string'
+
+/** Equal-time moves in chain order (a move whose `old` is another pending move's `new` waits); a cycle keeps the given order. */
+const chainOrder = (moves: readonly HistoryEvent[]): HistoryEvent[] => {
+  const pending = [...moves]
+  const ordered: HistoryEvent[] = []
+  while (pending.length > 0) {
+    const targets = new Set(pending.map(move => move.new).filter(value => typeof value === 'string'))
+    const ready = pending.findIndex(move => typeof move.old !== 'string' || !targets.has(move.old))
+    ordered.push(...pending.splice(Math.max(ready, 0), 1))
+  }
+  return ordered
+}
+
+/** Each run of equal time as: the field events, then the `path` events in chain order. An external rename keeps the scanned time, so a change and a move can share it. */
+const runOrder = (events: readonly HistoryEvent[]): HistoryEvent[] => {
+  const ordered: HistoryEvent[] = []
+  let start = 0
+  for (let end = 1; end <= events.length; end++) {
+    const first = events[start] as HistoryEvent
+    if (end < events.length && (events[end] as HistoryEvent).t === first.t) continue
+    const run = events.slice(start, end)
+    for (const e of run) if (!isPathEvent(e)) ordered.push(e)
+    ordered.push(...chainOrder(run.filter(isPathEvent)))
+    start = end
+  }
+  return ordered
+}
+
+type Group = { events: HistoryEvent[]; deleted: boolean }
+
+/** The group an event joins: the moved task's, a fresh one at a deleted task's path, or the path's own. */
+const groupFor = (byPath: ReadonlyMap<string, Group>, e: HistoryEvent, genuine: boolean): Group => {
+  if (isMove(e, genuine)) return byPath.get(e.old) ?? { events: [], deleted: false }
+  const kept = byPath.get(e.path)
+  return kept === undefined || (kept.deleted && !genuine) ? { events: [], deleted: false } : kept
+}
+
+/**
+ * Groups a timeline by the task's CURRENT path (vault-relative). A move carries the task's earlier
+ * events along and replaces whatever group the destination had; a delete marks the task deleted,
+ * a restore clears the mark (only genuine `path` events: see `isPathEvent`); a field event at a deleted task's path is another task and starts a
+ * fresh group. Every event of a task in the secrets folder is left out, and so is a move into or
+ * out of it. `secretsFolder` is `folders.secrets` of the vault's settings; empty hides nothing.
+ * The keys are NFC.
+ */
+export const groupHistory = (timeline: readonly HistoryEvent[], secretsFolder: string): Map<string, TaskTouchHistory> => {
+  const folder = secretsFolder.normalize('NFC') // paths are NFC (see `parseHistoryLine`)
+  const isSecret = (value: HistoryValue): boolean =>
+    typeof value === 'string' && folder !== '' && (value === folder || value.startsWith(`${folder}/`))
+  const byPath = new Map<string, Group>()
+  for (const e of runOrder(timeline)) {
+    const genuine = isPathEvent(e)
+    const task = groupFor(byPath, e, genuine)
+    if (isMove(e, genuine)) byPath.delete(e.old)
+    if (isSecret(e.path)) continue
+    if (genuine && isSecret(e.old)) {
+      byPath.delete(e.path) // a move out of the folder still replaces the group the destination had
+      continue
+    }
+    if (genuine) task.deleted = e.new === null
+    task.events.push(e)
+    byPath.set(e.path, task)
+  }
+  return byPath
+}
+
+// The last step of a task: the newest of its last Log line, its `start` stamp and the day of its
+// newest history event that is work on it (`history`, when the vault has one); the note's
+// modification time only when it has none of these. (The same rule as the Memoz app.) A file
+// time is not part of the maximum: a sync that rewrites the file would otherwise reset the clock
+// of a task nobody touched. On the same day the Log line wins, then `start`. The file time and the
+// history events are instants, read as LOCAL days, like "today".
+export const lastTouch = (note: ParsedNote, mtimeMs: number, history?: TaskTouchHistory | null): LastTouch | null => {
+  const candidates: LastTouch[] = [] // in tie order: the first of a day wins
   if (note.lastLog !== null) candidates.push({ day: note.lastLog, source: 'log' })
   if (note.start !== null) candidates.push({ day: note.start, source: 'start' })
+  const touched = history ? historyTouchDay(history) : null
+  if (touched !== null) candidates.push({ day: touched, source: 'history' })
   if (candidates.length === 0 && Number.isFinite(mtimeMs) && mtimeMs > 0) {
-    candidates.push({ day: utcDay(mtimeMs), source: 'edited' })
+    candidates.push({ day: localDay(mtimeMs), source: 'edited' })
   }
   let best: LastTouch | null = null
   for (const candidate of candidates) if (best === null || candidate.day > best.day) best = candidate
@@ -363,8 +578,9 @@ export const bandTask = (
   mtimeMs: number,
   today: string,
   stalledDays: number,
+  history?: TaskTouchHistory | null,
 ): BandTask => {
-  const touch = lastTouch(note, mtimeMs)
+  const touch = lastTouch(note, mtimeMs, history)
   const ageDays = touch ? daysBetween(touch.day, today) : null
   return {
     id,

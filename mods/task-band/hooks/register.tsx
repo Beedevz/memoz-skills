@@ -3,17 +3,22 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import type { BandSnapshot, BandTask } from '../types'
 import {
+  HISTORY_FILE,
   bandTask,
   barRuns,
   byPriority,
+  groupHistory,
+  historyTimeline,
+  parseHistoryFile,
   parseNote,
   resolveStalledDays,
   rowAlt,
   rowCells,
   rowLayout,
-  utcDay,
+  localDay,
   type ParsedNote,
   type RunKind,
+  type TaskTouchHistory,
 } from './band-model'
 import { desktopLayout, rowSvg } from './band-svg'
 
@@ -88,17 +93,65 @@ async function listNotes($: EngineInterface, dir: string, prefix: string): Promi
   return found
 }
 
-// `stalledDays` from the vault's `.memoz/settings.json`; a missing, unreadable or
-// unusable value is the default (2).
-async function readStalledDays($: EngineInterface, vault: string): Promise<number> {
+type VaultSettings = { stalledDays: number; secretsFolder: string }
+
+// `stalledDays` and `folders.secrets` from the vault's `.memoz/settings.json`; a missing, unreadable
+// or unusable value is the default (2 days; the folder `Secrets`, the app's default).
+async function readSettings($: EngineInterface, vault: string): Promise<VaultSettings> {
+  const settings: VaultSettings = { stalledDays: resolveStalledDays(undefined), secretsFolder: 'Secrets' }
   const path = `${vault}/.memoz/settings.json`
   try {
-    if (!(await $.fs.exists(path))) return resolveStalledDays(undefined)
+    if (!(await $.fs.exists(path))) return settings
     const parsed: unknown = JSON.parse(await $.fs.read(path))
-    const value = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>).stalledDays : undefined
-    return resolveStalledDays(value)
+    if (typeof parsed !== 'object' || parsed === null) return settings
+    const { stalledDays, folders } = parsed as Record<string, unknown>
+    const secrets = typeof folders === 'object' && folders !== null ? (folders as Record<string, unknown>).secrets : undefined
+    return {
+      stalledDays: resolveStalledDays(stalledDays),
+      secretsFolder: typeof secrets === 'string' ? secrets.trim().replace(/^\/+|\/+$/g, '') : settings.secretsFolder,
+    }
   } catch {
-    return resolveStalledDays(undefined)
+    return settings
+  }
+}
+
+// The vault's task history (`.memoz/history/*.jsonl`) by the task's vault-relative path (NFC, from the reader). Each
+// file is parsed again only when its mtime or size changed, and the whole is grouped again only when
+// some file changed. A vault with no history, or one that cannot be read, has none: the band then
+// behaves as it did before the history existed.
+type HistoryFileEntry = { mtimeMs: number; size: number; events: ReturnType<typeof parseHistoryFile> }
+let historyFiles = new Map<string, HistoryFileEntry>()
+let historyGroups: { signature: string; byPath: Map<string, TaskTouchHistory> } | undefined
+
+async function readHistory($: EngineInterface, vault: string, secretsFolder: string): Promise<Map<string, TaskTouchHistory>> {
+  const dir = `${vault}/.memoz/history`
+  try {
+    if (!(await $.fs.exists(dir))) return new Map()
+    const files = (await $.fs.list(dir)).filter(entry => entry.kind === 'file' && HISTORY_FILE.test(entry.name))
+    const next = new Map<string, HistoryFileEntry>()
+    for (const file of files) {
+      const path = `${dir}/${file.name}`
+      const cached = historyFiles.get(path)
+      let events = cached && cached.mtimeMs === file.mtimeMs && cached.size === file.size ? cached.events : undefined
+      try {
+        events ??= parseHistoryFile(await $.fs.read(path))
+      } catch {
+        // Unreadable now (a cloud drive may still be fetching it): keep what was read before, if
+        // anything, under its OLD mtime and size, so the file is read again on the next scan.
+        if (cached) next.set(path, cached)
+        continue
+      }
+      next.set(path, { mtimeMs: file.mtimeMs, size: file.size, events })
+    }
+    historyFiles = next
+    const signature = JSON.stringify([secretsFolder, ...[...next].map(([path, file]) => [path, file.mtimeMs, file.size])])
+    if (historyGroups?.signature !== signature) {
+      const grouped = groupHistory(historyTimeline([...next.values()].map(file => file.events)), secretsFolder)
+      historyGroups = { signature, byPath: grouped }
+    }
+    return historyGroups.byPath
+  } catch {
+    return new Map()
   }
 }
 
@@ -111,8 +164,9 @@ async function scan($: EngineInterface): Promise<BandSnapshot> {
   const root = `${vault}/${declaration.folder}`
   if (!(await $.fs.exists(root))) return { kind: 'missing', path: root }
 
-  const stalledDays = await readStalledDays($, vault)
-  const today = utcDay(await $.clock.now())
+  const { stalledDays, secretsFolder } = await readSettings($, vault)
+  const history = await readHistory($, vault, secretsFolder)
+  const today = localDay(await $.clock.now())
   const next = new Map<string, { mtimeMs: number; size: number; note: ParsedNote }>()
   const tasks: BandTask[] = []
   for (const file of await listNotes($, root, '')) {
@@ -121,7 +175,8 @@ async function scan($: EngineInterface): Promise<BandSnapshot> {
     const note = isFresh ? cached.note : parseNote(await $.fs.read(file.path))
     next.set(file.path, { mtimeMs: file.mtimeMs, size: file.size, note })
     if (note.status !== 'doing' && note.status !== 'review') continue
-    tasks.push(bandTask(file.id, note.status, note, file.mtimeMs, today, stalledDays))
+    const taskPath = `${declaration.folder.replace(/^(?:\.?\/)+|\/+$/g, '')}/${file.id}.md`.normalize('NFC')
+    tasks.push(bandTask(file.id, note.status, note, file.mtimeMs, today, stalledDays, history.get(taskPath)))
   }
   cache = next
   return { kind: 'tasks', tasks: tasks.sort(byPriority) }

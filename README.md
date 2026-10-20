@@ -147,19 +147,23 @@ priority (`P1`), the task code and title, its **stage** (four dots and the name:
 (`today`, `3d ago`) and a **flag** when the record disagrees with the status: `stalled` (a `doing`
 task whose last step is `stalledDays` or more days old), `no stage` and `no branch` (a `doing` task
 without a `stage:` or `branch:`), `no MR` (a `review` task without an `mr:`). The last step is the
-newer of the newest dated line (`- 2026-10-12 — …`) under a Log heading of the note and its `start:`
-stamp (the note's file time only when it has neither). A Log heading is a heading of any level whose
-text starts with `Log` or `Logs`; its deeper sub-headings belong to it, and it ends at the next
-heading of the same or a higher level. Dates are read as UTC days. `stalledDays` is read from the
-vault's `.memoz/settings.json` (a whole number of at least 1; default 2). Widths are counted in
-terminal columns (CJK and emoji take two). On a narrow band the pieces go in this order: the flag
-text becomes a `!`, then the stage name goes (the dots stay), then the age, then the title shrinks.
-On a very narrow band the row no longer fits and runs past the edge; where that happens depends on
-the tasks shown (the length of their codes and counts, whether any has a flag or a priority),
-somewhere around 40 to 45 columns. The desktop app draws the bar as a graphic, the terminal as text.
-✕ hides a row for the session; `n hidden · show` brings them back. A task is `doing` or `review` by
-its `status:` value as written, case ignored (a quoted `"doing"` is not a status, as in the app). It
-reads the same `.memoz/tasks.json` declaration as the skills and never writes to the vault.
+newest of the newest dated line (`- 2026-10-12 — …`) under a Log heading of the note, its `start:`
+stamp and, when the vault records a change history in `.memoz/history/`, the day of the task's last
+`status`, `stage` or checkbox change (the note's file time only when it has none of these). A Log
+heading is a heading of any level whose text starts with `Log` or `Logs`; its deeper sub-headings
+belong to it, and it ends at the next heading of the same or a higher level. Log and `start` dates
+are the days as written; "today", the day of a history event and the day of the note's file time
+(the fallback) are local calendar days (an event backfilled from a `start`/`done` stamp keeps the
+stamp's day). `stalledDays` is read from the vault's `.memoz/settings.json` (a whole number of at
+least 1; default 2). Widths are counted in terminal columns (CJK and emoji take two). On a narrow
+band the pieces go in this order: the flag text becomes a `!`, then the stage name goes (the dots
+stay), then the age, then the title shrinks. On a very narrow band the row no longer fits and runs
+past the edge; where that happens depends on the tasks shown (the length of their codes and counts,
+whether any has a flag or a priority), somewhere around 40 to 45 columns. The desktop app draws the
+bar as a graphic, the terminal as text. ✕ hides a row for the session; `n hidden · show` brings them
+back. A task is `doing` or `review` by its `status:` value as written, case ignored (a quoted
+`"doing"` is not a status, as in the app). It reads the same `.memoz/tasks.json` declaration as the
+skills and never writes to the vault.
 
 ```bash
 claude plugin install memoz-task-band@memoz-skills

@@ -10,8 +10,14 @@ import {
   daysBetween,
   displayWidth,
   flagText,
+  groupHistory,
+  HISTORY_FILE,
+  historyTimeline,
+  historyTouchDay,
   lastLogDate,
   lastTouch,
+  localDay,
+  parseHistoryFile,
   parseNote,
   priorityText,
   resolveStalledDays,
@@ -37,7 +43,8 @@ const TASKS = `${VAULT}/Tasks`
 const NOW = Date.parse('2026-10-15T12:00:00Z')
 const TODAY = '2026-10-15'
 
-type Fixture = Map<string, { text: string; mtimeMs: number }>
+// `fail`: reading the file throws (a file the drive has not fetched yet)
+type Fixture = Map<string, { text: string; mtimeMs: number; fail?: boolean }>
 
 const note = (frontmatter: string, body: string): string => `---\n${frontmatter}\n---\n${body}\n`
 
@@ -70,26 +77,31 @@ const fixtureFiles = (): Fixture =>
 
 // Answers the session's directory, HOME, the clock and the file system
 // from the fixture, and counts reads per path.
-const world = (on: On, files: Fixture) => {
+const world = (on: On, files: Fixture, now = NOW) => {
   const reads = new Map<string, number>()
   const isDir = (path: string) => [...files.keys()].some(file => file.startsWith(`${path}/`))
 
   mock.env(on, { HOME: '/home/u' })
-  const clock = mock.clock(on, { now: NOW })
+  const clock = mock.clock(on, { now })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.cwd', () => ({ value: CWD }))
-  on('fs.exists', ($, e) => ({ value: files.has(e.path) || isDir(e.path) }))
+  // a real file system reads `Tasks//x.md` and `./Tasks/x.md` as `Tasks/x.md`
+  const clean = (path: string) => path.replaceAll(/\/(?:\.?\/)+/g, '/')
+  on('fs.exists', ($, e) => ({ value: files.has(clean(e.path)) || isDir(clean(e.path)) }))
   on('fs.read', ($, e) => {
-    const file = files.get(e.path)
+    const path = clean(e.path)
+    const file = files.get(path)
     if (!file) return { deny: `ENOENT: ${e.path}` }
-    reads.set(e.path, (reads.get(e.path) ?? 0) + 1)
+    reads.set(path, (reads.get(path) ?? 0) + 1)
+    if (file.fail) return { deny: `EIO: ${e.path}` }
     return { value: file.text }
   })
   on('fs.list', ($, e) => {
     const names = new Map<string, FsEntry>()
+    const dir = clean(e.path)
     for (const [path, file] of files) {
-      if (!path.startsWith(`${e.path}/`)) continue
-      const rest = path.slice(e.path.length + 1)
+      if (!path.startsWith(`${dir}/`)) continue
+      const rest = path.slice(dir.length + 1)
       const [name, ...deeper] = rest.split('/')
       const isFile = deeper.length === 0
       names.set(name!, {
@@ -313,6 +325,342 @@ for (const surface of ['terminal', 'desktop'] as const) {
       expect((await ui.find({ type: 'Text', text: /tasks folder not found/ }))?.text).toContain(TASKS)
       await ui.unmount()
     })
+
+    // ── the vault's task history: .memoz/history/*.jsonl ──
+
+    const HISTORY = `${VAULT}/.memoz/history`
+    const DELTA = 'Tasks/ABC-4 — delta.md'
+    // delta: doing, last Log line 2026-10-10 → 5 days old on 2026-10-15, stalled
+    const withHistory = (...events: RawEvent[]): Fixture => {
+      const files = fixtureFiles()
+      files.set(`${HISTORY}/2026-10.app-abcd1234.jsonl`, { text: jsonl(...events), mtimeMs: 10 })
+      return files
+    }
+    const statusOfDelta = (day: string, id = 'e1') => event(id, T(day), DELTA, 'status', 'todo', 'doing')
+
+    test('a doing task with an old Log line but a recent status event is not stalled', OPTIONS, async ($, on) => {
+      const { clock } = world(on, withHistory(statusOfDelta('2026-10-14')))
+      await start($, clock)
+
+      const ui = await mount($)
+      const texts = await shownText(ui)
+      expect(texts).not.toContain('stalled')
+      expect(texts).toContain('delta')
+      await ui.unmount()
+    })
+
+    for (const [key, counts] of [['stage', true], ['~checkboxes', true], ['priority', false], ['~waived', false]] as const) {
+      test(`a ${key} event ${counts ? 'counts' : 'does not count'} as a touch`, OPTIONS, async ($, on) => {
+        const { clock } = world(on, withHistory(event('e1', T('2026-10-14'), DELTA, key, null, 'x')))
+        await start($, clock)
+
+        const ui = await mount($)
+        expect((await shownText(ui)).includes('stalled')).toBe(!counts)
+        await ui.unmount()
+      })
+    }
+
+    test('without history files the band behaves as before, whatever else sits in the folder', OPTIONS, async ($, on) => {
+      const files = fixtureFiles()
+      files.set(`${HISTORY}/notes.txt`, { text: JSON.stringify(statusOfDelta('2026-10-14')), mtimeMs: 10 })
+      files.set(`${HISTORY}/2026-10.app-abcd1234.jsonl.conflict`, { text: jsonl(statusOfDelta('2026-10-14')), mtimeMs: 10 })
+      const { clock } = world(on, files)
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('a history file that is not readable as events is ignored', OPTIONS, async ($, on) => {
+      const files = fixtureFiles()
+      files.set(`${HISTORY}/2026-10.app-abcd1234.jsonl`, { text: '{"id": "x"\nnot json at all\n', mtimeMs: 10 })
+      const { clock } = world(on, files)
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('the history of a task that was moved counts at its new path', OPTIONS, async ($, on) => {
+      const { clock } = world(
+        on,
+        withHistory(
+          event('e1', T('2026-10-14'), 'Tasks/old-name.md', 'status', 'todo', 'doing'),
+          event('e2', T('2026-10-14', '13:00:00'), DELTA, 'path', 'Tasks/old-name.md', DELTA),
+        ),
+      )
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('the history of another task does not count', OPTIONS, async ($, on) => {
+      const { clock } = world(on, withHistory(event('e1', T('2026-10-14'), 'Tasks/ABC-9 — other.md', 'status', 'todo', 'doing')))
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    test("a user's own `path:` field written by an older writer neither moves nor deletes the task", OPTIONS, async ($, on) => {
+      const { clock } = world(
+        on,
+        withHistory(
+          statusOfDelta('2026-10-14'),
+          event('e2', T('2026-10-14', '13:00:00'), DELTA, 'path', 'a/b', null),
+          event('e3', T('2026-10-14', '14:00:00'), DELTA, 'path', 'c/d', 'e/f'),
+        ),
+      )
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('the history of a deleted task counts for nothing', OPTIONS, async ($, on) => {
+      const { clock } = world(
+        on,
+        withHistory(statusOfDelta('2026-10-14'), event('e2', T('2026-10-14', '13:00:00'), DELTA, 'path', DELTA, null)),
+      )
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('the secrets folder comes from the vault settings: history under it is left out', OPTIONS, async ($, on) => {
+      const files = withHistory(statusOfDelta('2026-10-14'))
+      files.set(`${VAULT}/.memoz/settings.json`, { text: '{"folders": {"secrets": "/Tasks/"}}', mtimeMs: 1 })
+      const { clock } = world(on, files)
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('without a settings file the folder Secrets is left out: what happened there is not shown after a move out', OPTIONS, async ($, on) => {
+      const { clock } = world(
+        on,
+        withHistory(
+          event('e1', T('2026-10-14', '08:00:00'), 'Secrets/ABC-4 — delta.md', 'status', 'todo', 'doing'),
+          event('e2', T('2026-10-14'), DELTA, 'path', 'Secrets/ABC-4 — delta.md', DELTA),
+        ),
+      )
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('a change of the secrets folder in the settings regroups the history on the next refresh', OPTIONS, async ($, on) => {
+      const files = withHistory(statusOfDelta('2026-10-14'))
+      const { clock } = world(on, files)
+      await start($, clock)
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+
+      files.set(`${VAULT}/.memoz/settings.json`, { text: '{"folders": {"secrets": "Tasks"}}', mtimeMs: 2 })
+      await clock.advance(30_000)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    for (const [what, file, recorded] of [
+      ['a decomposed file name', 'ABC-4 — de\u0301lta.md', 'Tasks/ABC-4 — d\u00e9lta.md'],
+      ['a decomposed history path', 'ABC-4 — d\u00e9lta.md', 'Tasks/ABC-4 — de\u0301lta.md'],
+    ] as const) {
+      test(`${what} still finds the task's history`, OPTIONS, async ($, on) => {
+        const files = withHistory(event('e1', T('2026-10-14'), recorded, 'status', 'todo', 'doing'))
+        files.delete(`${TASKS}/ABC-4 — delta.md`)
+        files.set(`${TASKS}/${file}`, {
+          text: note('status: doing\npriority: 3', '- [x] a\n## Log\n- 2026-10-10 — old step'),
+          mtimeMs: 1,
+        })
+        const { clock } = world(on, files)
+        await start($, clock)
+
+        const ui = await mount($)
+        expect(await shownText(ui)).not.toContain('stalled')
+        await ui.unmount()
+      })
+    }
+
+    test('events of one task path in two Unicode forms are all counted (the NFD ones are not a second task)', OPTIONS, async ($, on) => {
+      const files = withHistory(
+        event('e1', T('2026-10-10'), 'Tasks/ABC-4 — d\u00e9lta.md', 'status', 'todo', 'doing'),
+        event('e2', T('2026-10-12'), 'Tasks/ABC-4 — de\u0301lta.md', 'stage', null, 'implementing'),
+        event('e3', T('2026-10-14'), 'Tasks/ABC-4 — d\u00e9lta.md', '~checkboxes', '0/1', '1/1'),
+      )
+      files.delete(`${TASKS}/ABC-4 — delta.md`)
+      files.set(`${TASKS}/ABC-4 — d\u00e9lta.md`, {
+        text: note('status: doing\npriority: 3', '- [x] a\n## Log\n- 2026-10-10 — old step'),
+        mtimeMs: 1,
+      })
+      const { clock } = world(on, files)
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('a settings file without a secrets folder leaves the default, Secrets', OPTIONS, async ($, on) => {
+      const files = withHistory(statusOfDelta('2026-10-14'))
+      files.set(`${VAULT}/.memoz/settings.json`, { text: '{"stalledDays": 2, "folders": {"daily": "Daily"}}', mtimeMs: 1 })
+      const { clock } = world(on, files)
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('the timer rereads a history file only when it changed, and a new event is picked up', OPTIONS, async ($, on) => {
+      const files = withHistory(statusOfDelta('2026-10-01'))
+      const { clock, reads } = world(on, files)
+      await start($, clock)
+      const file = `${HISTORY}/2026-10.app-abcd1234.jsonl`
+      expect(reads.get(file)).toBe(1)
+
+      await clock.advance(30_000)
+      expect(reads.get(file)).toBe(1)
+
+      files.set(file, { text: jsonl(statusOfDelta('2026-10-01'), statusOfDelta('2026-10-14', 'e2')), mtimeMs: 11 })
+      await clock.advance(30_000)
+      expect(reads.get(file)).toBe(2)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    // `today` is the local day. alpha (ABC-1): Log 2026-10-14, start 2026-10-12, stalled at 2 days; delta is taken out.
+    const alphaOnly = (): Fixture => {
+      const files = fixtureFiles()
+      files.delete(`${TASKS}/ABC-4 — delta.md`)
+      return files
+    }
+
+    test('today is the local day: 00:30 on the 16th is the 16th, so alpha (last step the 14th) is stalled', OPTIONS, async ($, on) => {
+      const { clock } = world(on, alphaOnly(), localInstant(16, 0, 30))
+      await start($, clock)
+
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('today is the local day: 23:30 on the 15th is the 15th, so alpha (last step the 14th) is not stalled', OPTIONS, async ($, on) => {
+      const { clock } = world(on, alphaOnly(), localInstant(15, 23, 30))
+      await start($, clock)
+
+      const ui = await mount($)
+      const texts = await shownText(ui)
+      expect(texts).toContain('alpha')
+      expect(texts).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    // delta: last Log line the 10th. An event at 00:30 or 23:30 local on the 14th is the 14th, one day old on the 15th.
+    for (const [hour, minute] of [[0, 30], [23, 30]] as const) {
+      test(`a history event at ${hour}:${minute} local counts on its local day`, OPTIONS, async ($, on) => {
+        const { clock } = world(
+          on,
+          withHistory(event('e1', iso(localInstant(14, hour, minute)), DELTA, 'status', 'todo', 'doing')),
+          localInstant(15, 12, 0),
+        )
+        await start($, clock)
+
+        const ui = await mount($)
+        const texts = await shownText(ui)
+        expect(texts).not.toContain('stalled')
+        expect(texts).toContain(surface === 'desktop' ? 'last step 1d ago' : '1d ago')
+        await ui.unmount()
+      })
+    }
+
+    test('a history file whose read fails is skipped, not remembered: it is read again on the next refresh', OPTIONS, async ($, on) => {
+      const file = `${HISTORY}/2026-10.app-abcd1234.jsonl`
+      const files = withHistory(statusOfDelta('2026-10-14'))
+      const text = files.get(file)!.text
+      files.set(file, { text, mtimeMs: 10, fail: true })
+      const { clock } = world(on, files)
+      await start($, clock)
+      const ui = await mount($)
+      expect(await shownText(ui)).toContain('stalled')
+
+      files.set(file, { text, mtimeMs: 10 }) // same mtime and size: the drive has fetched it
+      await clock.advance(30_000)
+      expect(await shownText(ui)).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('a history file that cannot be read after it was read keeps what was read before, and is read again', OPTIONS, async ($, on) => {
+      const file = `${HISTORY}/2026-10.app-abcd1234.jsonl`
+      const files = withHistory(statusOfDelta('2026-10-14'))
+      const { clock, reads } = world(on, files)
+      await start($, clock)
+      const ui = await mount($)
+      expect(await shownText(ui)).not.toContain('stalled')
+
+      files.set(file, { text: jsonl(statusOfDelta('2026-10-01')), mtimeMs: 11, fail: true }) // changed, and the drive has not fetched it
+      await clock.advance(30_000)
+      expect(await shownText(ui)).not.toContain('stalled')
+
+      files.set(file, { text: jsonl(statusOfDelta('2026-10-01')), mtimeMs: 11 }) // fetched: the new content is read
+      await clock.advance(30_000)
+      expect(reads.get(file)).toBe(3)
+      expect(await shownText(ui)).toContain('stalled')
+      await ui.unmount()
+    })
+
+    test('a tasks folder declared with a trailing slash still finds the history', OPTIONS, async ($, on) => {
+      const files = withHistory(statusOfDelta('2026-10-14'))
+      files.set(`${CWD}/.memoz/tasks.json`, { text: '{"backend":"vault","vault":"V","folder":"Tasks/"}', mtimeMs: 1 })
+      const { clock } = world(on, files)
+      await start($, clock)
+
+      const ui = await mount($)
+      const texts = await shownText(ui)
+      expect(texts).toContain('delta')
+      expect(texts).not.toContain('stalled')
+      await ui.unmount()
+    })
+
+    for (const folder of ['./Tasks', './/Tasks/', '/Tasks']) {
+      test(`a tasks folder declared as ${folder} still finds the history`, OPTIONS, async ($, on) => {
+        const files = withHistory(statusOfDelta('2026-10-14'))
+        files.set(`${CWD}/.memoz/tasks.json`, { text: JSON.stringify({ backend: 'vault', vault: 'V', folder }), mtimeMs: 1 })
+        const { clock } = world(on, files)
+        await start($, clock)
+
+        const ui = await mount($)
+        const texts = await shownText(ui)
+        expect(texts).toContain('delta')
+        expect(texts).not.toContain('stalled')
+        await ui.unmount()
+      })
+    }
+
+    test('a history event shows as the last step, in days', OPTIONS, async ($, on) => {
+      const { clock } = world(on, withHistory(statusOfDelta('2026-10-13')))
+      await start($, clock)
+
+      const ui = await mount($)
+      const texts = await shownText(ui)
+      expect(texts).toContain(surface === 'desktop' ? 'last step 2d ago' : '2d ago')
+      expect(texts).not.toContain('5d ago')
+      await ui.unmount()
+    })
   })
 }
 
@@ -342,11 +690,15 @@ test('a vault declared by absolute path needs no vaultsDir', async ($, on) => {
 
 // ── the shared fixture: the band counts boxes and reads the Log the way the app does ──
 
+const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
 describe('shared fixture (tests/band-fixture.ts, the Memoz app keeps a copy)', () => {
   test('has cases to run', () => {
     expect(fixture.boxCases.length).toBeGreaterThan(0)
     expect(fixture.logCases.length).toBeGreaterThan(0)
     expect(fixture.touchCases.length).toBeGreaterThan(0)
+    expect(fixture.historyCases.length).toBeGreaterThan(0)
+    expect(fixture.timelineCases.length).toBeGreaterThan(0)
     expect(fixture.fieldCases.length).toBeGreaterThan(0)
   })
 
@@ -376,11 +728,32 @@ describe('shared fixture (tests/band-fixture.ts, the Memoz app keeps a copy)', (
     })
   }
 
-  for (const { name, note: text, modifiedAt, today, expected } of fixture.touchCases) {
+  // A mod test cannot set the time zone (no `process`): a case with a `zone` runs when the device is in
+  // that zone, so the suite is run in each zone it names (TZ=Europe/Istanbul, TZ=America/New_York).
+  const here = (zone: string | undefined): boolean => zone === undefined || zone === deviceZone
+
+  for (const { name, note: text, modifiedAt, today, expected } of fixture.touchCases.filter(c => here(c.zone))) {
     test(`last touch: ${name}`, () => {
       const touch = lastTouch(parseNote(text), modifiedAt === null ? 0 : Date.parse(modifiedAt))
       const got = touch && { day: touch.day, source: touch.source, ageDays: daysBetween(touch.day, today) }
       expect(got ?? null).toEqual(expected)
+    })
+  }
+
+  for (const { name, note: text, modifiedAt, today, history, expected } of fixture.historyCases.filter(c => here(c.zone))) {
+    test(`last touch with history: ${name}`, () => {
+      const touch = lastTouch(parseNote(text), modifiedAt === null ? 0 : Date.parse(modifiedAt), history)
+      const got = touch && { day: touch.day, source: touch.source, ageDays: daysBetween(touch.day, today) }
+      expect(got ?? null).toEqual(expected)
+    })
+  }
+
+  // Raw events of the history files in, per task path { touchDay, deleted } out: the app's reader is held to the same cases.
+  for (const { name, files, secretsFolder, expected } of fixture.timelineCases.filter(c => here(c.zone))) {
+    test(`history reader: ${name}`, () => {
+      const groups = groupHistory(historyTimeline(files.map(file => parseHistoryFile(jsonl(...file)))), secretsFolder ?? 'Secrets')
+      const got = Object.fromEntries([...groups].map(([path, task]) => [path, { touchDay: historyTouchDay(task), deleted: task.deleted === true }]))
+      expect(got).toEqual(expected)
     })
   }
 })
@@ -388,6 +761,386 @@ describe('shared fixture (tests/band-fixture.ts, the Memoz app keeps a copy)', (
 test('the Log reader is also reachable on a bare body', () => {
   expect(lastLogDate('## Log\n- 2026-10-02 — a\n')).toBe('2026-10-02')
   expect(lastLogDate('')).toBeNull()
+})
+
+// ── the task's change history ────────────────────────────────────────────
+
+type RawEvent = { id: string; t: string; path: string; key: string; old: unknown; new: unknown; writer: string }
+const event = (
+  id: string,
+  t: string,
+  path: string,
+  key: string,
+  from: unknown,
+  to: unknown,
+  writer = 'app',
+): RawEvent => ({ id, t, path, key, old: from, new: to, writer })
+const jsonl = (...events: RawEvent[]): string => `${events.map(e => JSON.stringify(e)).join('\n')}\n`
+const T = (day: string, time = '12:00:00') => `${day}T${time}.000Z`
+// What the band does with the files of a history: one timeline, grouped by the task's current path.
+const grouped = (events: RawEvent[], secrets = 'Secrets') =>
+  groupHistory(historyTimeline([parseHistoryFile(jsonl(...events))]), secrets)
+const keysOf = (events: readonly { key: string }[] | undefined) => (events ?? []).map(e => e.key)
+
+test('historyTouchDay: only status, stage and ~checkboxes count; the last one decides; a deleted task counts for nothing', () => {
+  const at = (key: string, writer = 'app') => ({ t: T('2026-10-14'), key, writer })
+  for (const key of ['status', 'stage', '~checkboxes']) expect(historyTouchDay({ events: [at(key)] }), key).toBe('2026-10-14')
+  for (const key of ['priority', 'path', '~waived', 'title', 'start', 'branch', '']) {
+    expect(historyTouchDay({ events: [at(key)] }), key).toBeNull()
+  }
+  const events = [{ t: T('2026-10-11'), key: 'status' }, { t: T('2026-10-13'), key: 'stage' }, at('priority')]
+  expect(historyTouchDay({ events })).toBe('2026-10-13')
+  expect(historyTouchDay({ events, deleted: true })).toBeNull()
+  expect(historyTouchDay({ events: [] })).toBeNull()
+})
+
+test('historyTouchDay: a backfill event is its stamp day, an invalid one and a bad time are none', () => {
+  expect(historyTouchDay({ events: [{ t: '2026-10-11T00:00:00.000Z', key: 'status', writer: 'backfill' }] })).toBe('2026-10-11')
+  expect(historyTouchDay({ events: [{ t: '2026-02-30T00:00:00.000Z', key: 'status', writer: 'backfill' }] })).toBeNull()
+  expect(historyTouchDay({ events: [{ t: 'garbage', key: 'status' }] })).toBeNull()
+})
+
+// ── local days ──
+// A mod test cannot change the device's time zone (no `process`), so these build the instant FROM local
+// clock parts: 01:30 and 23:30 on the 13th are, in any zone but UTC, on another UTC date (east of UTC the
+// early one, west of it the late one). The expected day is the local one by construction. Run the suite in two
+// zones: `TZ=Europe/Istanbul` and `TZ=America/New_York` (in UTC itself nothing here can tell local from UTC).
+const localInstant = (day: number, hour: number, minute: number, month = 10): number =>
+  new Date(2026, month - 1, day, hour, minute).getTime()
+const iso = (ms: number): string => new Date(ms).toISOString()
+
+test("historyTouchDay: an event's day is the local day of its time; a backfill stamp stays its own day", () => {
+  for (const [hour, minute] of [[0, 30], [1, 30], [12, 0], [22, 0], [23, 30]] as const) {
+    const t = iso(localInstant(13, hour, minute))
+    expect(historyTouchDay({ events: [{ t, key: 'status', writer: 'app' }] }), t).toBe('2026-10-13')
+  }
+  expect(historyTouchDay({ events: [{ t: '2026-10-11T00:00:00.000Z', key: 'status', writer: 'backfill' }] })).toBe('2026-10-11')
+})
+
+test('localDay: the calendar day of an instant in the device zone', () => {
+  expect(localDay(localInstant(16, 0, 30))).toBe('2026-10-16')
+  expect(localDay(localInstant(15, 23, 30))).toBe('2026-10-15')
+  expect(localDay(localInstant(1, 12, 0, 12))).toBe('2026-12-01')
+})
+
+test('a history file name is month, kind and an 8-character id', () => {
+  expect(HISTORY_FILE.test('2026-10.app-abcd1234.jsonl')).toBe(true)
+  expect(HISTORY_FILE.test('2026-10.external-abcd1234.jsonl')).toBe(true)
+  for (const name of ['x.jsonl', '2026-10.app.jsonl', '2026-10.app-ABCD1234.jsonl', '2026-10.app-abcd123.jsonl', '2026-10.app-abcd1234.json']) {
+    expect(HISTORY_FILE.test(name), name).toBe(false)
+  }
+})
+
+test('a history file is read line by line: a line that is not a well-formed event is skipped', () => {
+  const good = event('a', T('2026-10-14'), 'Tasks/x.md', 'status', 'todo', 'doing')
+  const text = [
+    JSON.stringify(good),
+    '',
+    'not json',
+    '[1,2]',
+    'null',
+    JSON.stringify({ ...good, id: 1 }),
+    JSON.stringify({ ...good, id: 'b', writer: 'someone' }),
+    JSON.stringify({ ...good, id: 'c', t: '2026-10-14T12:00:00Z' }),
+    JSON.stringify({ ...good, id: 'd', t: '2026-02-30T12:00:00.000Z' }),
+    JSON.stringify({ ...good, id: 'e', old: 5 }),
+    JSON.stringify({ ...good, id: 'f', new: ['a', 1] }),
+    JSON.stringify({ ...good, id: 'g', key: undefined }),
+    JSON.stringify({ ...good, id: 'h', new: ['a', 'b'] }),
+  ].join('\n')
+  expect(parseHistoryFile(text).map(e => e.id)).toEqual(['a', 'h'])
+  expect(parseHistoryFile('')).toEqual([])
+})
+
+test('the timeline keeps one event per id, the best writer\'s, in time order', () => {
+  const app = event('1', T('2026-10-14'), 'Tasks/x.md', 'status', 'todo', 'doing', 'app')
+  const observed = { ...app, writer: 'external' }
+  const earlier = event('2', T('2026-10-13'), 'Tasks/x.md', 'stage', null, 'implementing', 'cli')
+  for (const files of [[[observed], [app, earlier]], [[app, earlier], [observed]]]) {
+    const timeline = historyTimeline(files.map(file => parseHistoryFile(jsonl(...file))))
+    expect(timeline.map(e => [e.id, e.writer])).toEqual([['2', 'cli'], ['1', 'app']])
+  }
+})
+
+test('at an equal time the writer\'s own event comes before an observer\'s, then path order', () => {
+  const t = T('2026-10-14')
+  const timeline = historyTimeline([
+    parseHistoryFile(
+      jsonl(
+        event('o', t, 'Tasks/a.md', 'status', 'todo', 'doing', 'external'),
+        event('b', t, 'Tasks/b.md', 'status', 'todo', 'doing', 'app'),
+        event('a', t, 'Tasks/a.md', 'stage', null, 'x', 'app'),
+      ),
+    ),
+  ])
+  expect(timeline.map(e => e.id)).toEqual(['a', 'b', 'o'])
+})
+
+test('the timeline drops an external repeat of a value already reached, and a backfill guess a real event reached', () => {
+  const timeline = historyTimeline([
+    parseHistoryFile(
+      jsonl(
+        event('1', T('2026-10-10'), 'Tasks/x.md', 'status', 'todo', 'doing', 'app'),
+        event('2', T('2026-10-12'), 'Tasks/x.md', 'status', 'doing', 'review', 'app'),
+        event('3', T('2026-10-14'), 'Tasks/x.md', 'status', 'doing', 'review', 'external'), // re-recorded at a later edit
+        event('4', T('2026-10-14'), 'Tasks/x.md', 'status', 'review', 'done', 'external'), // a real change an observer saw
+        event('5', '2026-10-10T00:00:00.000Z', 'Tasks/x.md', 'status', null, 'doing', 'backfill'), // the stamp the app already wrote
+        event('6', '2026-10-01T00:00:00.000Z', 'Tasks/y.md', 'status', null, 'doing', 'backfill'), // nothing else knows it
+      ),
+    ),
+  ])
+  expect(timeline.map(e => e.id)).toEqual(['6', '1', '2', '4'])
+})
+
+test('an external event is kept when it is the first for its key', () => {
+  const timeline = historyTimeline([parseHistoryFile(jsonl(event('1', T('2026-10-14'), 'Tasks/x.md', 'status', 'todo', 'doing', 'external')))])
+  expect(timeline.map(e => e.id)).toEqual(['1'])
+})
+
+test('grouping: events by path; a move carries the task\'s events to its new path', () => {
+  const groups = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/b.md', 'stage', null, 'implementing'),
+    event('3', T('2026-10-12'), 'Tasks/sub/a.md', 'path', 'Tasks/a.md', 'Tasks/sub/a.md'),
+    event('4', T('2026-10-13'), 'Tasks/sub/a.md', '~checkboxes', '0/1', '1/1'),
+  ])
+  expect([...groups.keys()].sort()).toEqual(['Tasks/b.md', 'Tasks/sub/a.md'])
+  expect(keysOf(groups.get('Tasks/sub/a.md')?.events)).toEqual(['status', 'path', '~checkboxes'])
+  expect(historyTouchDay(groups.get('Tasks/sub/a.md')!)).toBe('2026-10-13')
+  expect(historyTouchDay(groups.get('Tasks/b.md')!)).toBe('2026-10-11')
+})
+
+test('grouping: a delete marks the task, a restore clears the mark and keeps its events', () => {
+  const del = event('2', T('2026-10-12'), 'Tasks/a.md', 'path', 'Tasks/a.md', null)
+  const events = [event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'), del]
+  expect(grouped(events).get('Tasks/a.md')?.deleted).toBe(true)
+  expect(historyTouchDay(grouped(events).get('Tasks/a.md')!)).toBeNull()
+  const restored = grouped([...events, event('3', T('2026-10-13'), 'Tasks/a.md', 'path', null, 'Tasks/a.md')]).get('Tasks/a.md')
+  expect(restored?.deleted).toBe(false)
+  expect(historyTouchDay(restored!)).toBe('2026-10-10')
+})
+
+test('grouping: a user\'s own `path:` field recorded by an older writer (key path, the note\'s own path) is a field change, not a move', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'old/value', 'new/value'), // not a move: the path is the note's own
+  ])
+  expect([...group.keys()]).toEqual(['Tasks/a.md'])
+  expect(keysOf(group.get('Tasks/a.md')?.events)).toEqual(['status', 'path'])
+  expect(group.get('Tasks/a.md')?.deleted).toBe(false)
+  expect(historyTouchDay(group.get('Tasks/a.md')!)).toBe('2026-10-10')
+})
+
+test('grouping: a user\'s `path:` field whose old value names the secrets folder is still a field change', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'Secrets/z', 'elsewhere'),
+  ]).get('Tasks/a.md')
+  expect(group?.events.map(e => e.id)).toEqual(['1', '2'])
+})
+
+test('grouping: removing the user\'s `path:` field (new null, the note\'s own path) is not a delete', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'old/value', null),
+  ]).get('Tasks/a.md')
+  expect(group?.deleted).toBe(false)
+  expect(keysOf(group?.events)).toEqual(['status', 'path'])
+  expect(historyTouchDay(group!)).toBe('2026-10-10')
+})
+
+test('grouping: a user\'s `path:` field event at a deleted task\'s path is another task and starts a fresh group', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'Tasks/a.md', null), // deleted
+    event('3', T('2026-10-12'), 'Tasks/a.md', 'path', 'x', 'y'), // a user field on a task created there
+  ]).get('Tasks/a.md')
+  expect(group?.events.map(e => e.id)).toEqual(['3'])
+  expect(group?.deleted).toBe(false)
+})
+
+test('grouping: the same shapes are genuine when the path is the new (move, restore) or the old (delete) path', () => {
+  const moved = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/b.md', 'path', 'Tasks/a.md', 'Tasks/b.md'),
+  ])
+  expect([...moved.keys()]).toEqual(['Tasks/b.md'])
+  const deleted = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'Tasks/a.md', null),
+  ])
+  expect(deleted.get('Tasks/a.md')?.deleted).toBe(true)
+})
+
+test('grouping: a user\'s `path:` field event stays a field event beside a real move of the same time', () => {
+  const t = T('2026-10-14')
+  // the user field event and a real move share a time; the field event stays a field event (before the move)
+  const events = [
+    event('1', T('2026-10-10'), 'Tasks/x.md', 'status', 'todo', 'doing'),
+    event('2', t, 'Tasks/x.md', 'path', 'one', 'two'),
+    event('3', t, 'Archive/x.md', 'path', 'Tasks/x.md', 'Archive/x.md'),
+  ]
+  const groups = grouped(events)
+  expect([...groups.keys()]).toEqual(['Archive/x.md'])
+  expect(keysOf(groups.get('Archive/x.md')?.events)).toEqual(['status', 'path', 'path'])
+  expect(groups.get('Archive/x.md')?.events.map(e => e.id)).toEqual(['1', '2', '3'])
+})
+
+test('grouping: an escaped user key (`~key:path`) is a plain field change', () => {
+  const group = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', '~key:path', 'x', 'y'),
+    event('3', T('2026-10-12'), 'Tasks/a.md', '~key:path', 'y', null),
+  ]).get('Tasks/a.md')
+  expect(group?.deleted).toBe(false)
+  expect(keysOf(group?.events)).toEqual(['status', '~key:path', '~key:path'])
+  expect(historyTouchDay(group!)).toBe('2026-10-10') // a user field is not work on the task
+  // even a value that looks like a delete (the note's own path as old, new null) is a field change under the escaped key
+  const lookalike = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', '~key:path', 'Tasks/a.md', null),
+  ]).get('Tasks/a.md')
+  expect(lookalike?.deleted).toBe(false)
+  // and after a delete it is a field event at a deleted task's path: another task, a fresh group
+  const fresh = grouped([
+    event('1', T('2026-10-10'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-11'), 'Tasks/a.md', 'path', 'Tasks/a.md', null),
+    event('3', T('2026-10-12'), 'Tasks/a.md', '~key:path', 'x', 'y'),
+  ]).get('Tasks/a.md')
+  expect(fresh?.events.map(e => e.id)).toEqual(['3'])
+  expect(fresh?.deleted).toBe(false)
+})
+
+test('grouping: a field event at a deleted task\'s path is another task and starts a fresh group', () => {
+  const group = grouped([
+    event('1', T('2026-10-01'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-02'), 'Tasks/a.md', 'path', 'Tasks/a.md', null),
+    event('3', T('2026-10-11'), 'Tasks/a.md', 'status', null, 'todo'),
+  ]).get('Tasks/a.md')
+  expect(group).toMatchObject({ deleted: false })
+  expect(group?.events.map(e => e.id)).toEqual(['3'])
+})
+
+test('grouping: a moved task never inherits the group the destination had', () => {
+  const group = grouped([
+    event('1', T('2026-10-01'), 'Tasks/a.md', 'status', 'todo', 'doing'), // task X
+    event('2', T('2026-10-02'), 'Tasks/a.md', 'path', 'Tasks/a.md', null), // X deleted
+    event('3', T('2026-10-11'), 'Tasks/a.md', 'path', 'Inbox/y.md', 'Tasks/a.md'), // Y moved there, no events of its own
+  ]).get('Tasks/a.md')
+  expect(group?.events.map(e => e.id)).toEqual(['3'])
+  expect(group?.deleted).toBe(false)
+  expect(historyTouchDay(group!)).toBeNull()
+})
+
+test('grouping: at an equal time a field change comes before a move, so it stays with the moved task', () => {
+  const t = T('2026-10-14')
+  // The move's path sorts before the change's path: the timeline puts the move first.
+  const events = [
+    event('1', t, 'Tasks/x.md', 'status', 'todo', 'doing'),
+    event('2', t, 'Archive/x.md', 'path', 'Tasks/x.md', 'Archive/x.md'),
+  ]
+  expect(historyTimeline([parseHistoryFile(jsonl(...events))]).map(e => e.id)).toEqual(['2', '1'])
+  const groups = grouped(events)
+  expect([...groups.keys()]).toEqual(['Archive/x.md'])
+  expect(historyTouchDay(groups.get('Archive/x.md')!)).toBe('2026-10-14')
+})
+
+test('grouping: equal-time moves follow their chain (x to y before y to a)', () => {
+  const t = T('2026-10-14')
+  const events = [
+    event('1', T('2026-10-10'), 'Tasks/x.md', 'status', 'todo', 'doing'),
+    event('2', t, 'Tasks/y.md', 'path', 'Tasks/x.md', 'Tasks/y.md'),
+    event('3', t, 'Tasks/a.md', 'path', 'Tasks/y.md', 'Tasks/a.md'),
+  ]
+  expect(historyTimeline([parseHistoryFile(jsonl(...events))]).map(e => e.id)).toEqual(['1', '3', '2']) // by path: a before y
+  const groups = grouped(events)
+  expect([...groups.keys()]).toEqual(['Tasks/a.md'])
+  expect(keysOf(groups.get('Tasks/a.md')?.events)).toEqual(['status', 'path', 'path'])
+})
+
+test('grouping: moves that form a cycle keep the timeline\'s order and do not hang', () => {
+  const t = T('2026-10-14')
+  const groups = grouped([
+    event('1', t, 'Tasks/b.md', 'path', 'Tasks/a.md', 'Tasks/b.md'),
+    event('2', t, 'Tasks/a.md', 'path', 'Tasks/b.md', 'Tasks/a.md'),
+  ])
+  // by path the timeline is 2 then 1; 2 finds nothing at b, 1 then carries it from a to b
+  expect([...groups.keys()]).toEqual(['Tasks/b.md'])
+  expect(groups.get('Tasks/b.md')?.events.map(e => e.id)).toEqual(['2', '1'])
+})
+
+test('grouping: the secrets folder is left out, a move into or out of it too', () => {
+  const groups = grouped([
+    event('1', T('2026-10-01'), 'Secrets/s.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-02'), 'Secrets/deep/s.md', 'stage', null, 'x'),
+    event('3', T('2026-10-03'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('4', T('2026-10-04'), 'Secrets/a.md', 'path', 'Tasks/a.md', 'Secrets/a.md'), // into the folder
+    event('5', T('2026-10-05'), 'Tasks/z.md', 'status', 'todo', 'doing'),
+  ])
+  expect([...groups.keys()]).toEqual(['Tasks/z.md'])
+  expect(grouped([event('1', T('2026-10-01'), 'Secretsz/s.md', 'status', 'todo', 'doing')]).has('Secretsz/s.md')).toBe(true)
+})
+
+test('grouping: a move out of the secrets folder shows nothing of its past, and drops the group the destination had', () => {
+  const groups = grouped([
+    event('1', T('2026-10-01'), 'Tasks/b.md', 'status', 'todo', 'doing'),
+    event('2', T('2026-10-02'), 'Tasks/b.md', 'path', 'Tasks/b.md', null),
+    event('3', T('2026-10-03'), 'Tasks/b.md', 'path', 'Secrets/b.md', 'Tasks/b.md'), // out of the folder
+  ])
+  expect(groups.has('Tasks/b.md')).toBe(false)
+  const later = grouped([
+    event('1', T('2026-10-03'), 'Tasks/b.md', 'path', 'Secrets/b.md', 'Tasks/b.md'),
+    event('2', T('2026-10-04'), 'Tasks/b.md', 'stage', null, 'x'),
+  ]).get('Tasks/b.md')
+  expect(later?.events.map(e => e.id)).toEqual(['2'])
+})
+
+test('grouping: an empty secrets folder hides nothing', () => {
+  const events = [event('1', T('2026-10-01'), 'Secrets/s.md', 'status', 'todo', 'doing')]
+  expect(grouped(events, '').has('Secrets/s.md')).toBe(true)
+  expect(grouped(events, 'Private').has('Secrets/s.md')).toBe(true)
+})
+
+test('grouping: the secrets folder itself is a secrets path', () => {
+  expect(grouped([event('1', T('2026-10-01'), 'Secrets', 'status', 'todo', 'doing')]).size).toBe(0)
+})
+
+// One task path recorded in two Unicode forms (NFC by a write, NFD by a reconcile of a file name a
+// drive or an OS decomposed) is ONE task: the events are merged when they are read.
+const NFC_PATH = 'Tasks/\u00e9.md'
+const NFD_PATH = 'Tasks/e\u0301.md'
+
+test('grouping: one task path in two Unicode forms is one group, whatever the order of the events', () => {
+  const groups = grouped([
+    event('1', T('2026-10-10'), NFC_PATH, 'status', 'todo', 'doing'),
+    event('2', T('2026-10-12'), NFD_PATH, 'stage', null, 'implementing'),
+    event('3', T('2026-10-14'), NFC_PATH, '~checkboxes', '0/1', '1/1'),
+  ])
+  expect([...groups.keys()]).toEqual([NFC_PATH])
+  expect(keysOf(groups.get(NFC_PATH)?.events)).toEqual(['status', 'stage', '~checkboxes'])
+  expect(historyTouchDay(groups.get(NFC_PATH)!)).toBe('2026-10-14')
+})
+
+test('reading: path, old and new of an event are NFC; a move between two forms is a move, not a new path', () => {
+  const [moved, listed] = parseHistoryFile(
+    jsonl(
+      event('1', T('2026-10-10'), NFD_PATH, 'path', 'Tasks/a.md', NFD_PATH),
+      event('2', T('2026-10-11'), NFD_PATH, 'branch', ['e\u0301', 'x'], 'e\u0301'),
+    ),
+  )
+  expect([moved!.path, moved!.new]).toEqual([NFC_PATH, NFC_PATH])
+  expect([listed!.path, listed!.old, listed!.new]).toEqual([NFC_PATH, ['\u00e9', 'x'], '\u00e9'])
+  const groups = grouped([
+    event('0', T('2026-10-09'), 'Tasks/a.md', 'status', 'todo', 'doing'),
+    event('1', T('2026-10-10'), NFD_PATH, 'path', 'Tasks/a.md', NFD_PATH),
+  ])
+  expect([...groups.keys()]).toEqual([NFC_PATH])
+  expect(groups.get(NFC_PATH)?.deleted).toBe(false)
+})
+
+test('grouping: a secrets folder written in another Unicode form still hides its tasks', () => {
+  const folder = 'S\u00e9crets'
+  expect(grouped([event('1', T('2026-10-01'), 'Se\u0301crets/s.md', 'status', 'todo', 'doing')], folder).size).toBe(0)
 })
 
 // ── reading a note ───────────────────────────────────────────────────────
