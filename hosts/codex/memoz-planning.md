@@ -99,7 +99,9 @@ One line: what this milestone delivers.
 
 Each piece is a task **card**: frontmatter (with `milestone`), a one-line goal, links, completion
 criteria, *Not Doing*, a `## Log` section of one-line dated entries. Task-flow, *The task card, its folder and its
-fields*, has the layout. A piece that has a scope also gets a **brief** in the task's own folder
+fields*, has the layout. When the vault offers a tool that creates a task (a `create_task`-style
+call), create the card with it — it gives the id and the layout — and write the fields it does not
+take (such as `milestone`) after, with a field tool or a surgical edit. A piece that has a scope also gets a **brief** in the task's own folder
 (`<prefix>-NN/<prefix>-NN brief`): why the piece exists, its scope, what it changes. The brief is
 required; only a one-line fix whose scope fits in the goal line goes without. Write it now, while
 the reasoning is fresh; the exclusions and the criteria stay on the card, because the card is what

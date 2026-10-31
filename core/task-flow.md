@@ -253,14 +253,18 @@ hand edit. After a move — by a stamping tool or by hand — read the note back
 that after a reopen `done` is gone, and that after a reopen to `doing` `stage` is set; write the
 missing stamp or stage, or remove the stale `done` or `stage`, surgically if not. A hand edit is never done with a tool that replaces the whole note (an
 `update_note`-style call): it is a surgical edit of the frontmatter lines it changes (a file
-edit), or a status tool that stamps the field when there is one.
+edit), or a status tool that stamps the field when there is one. A field tool that rewrites one
+frontmatter line (a `set_task_field`-style call) writes the other fields (`milestone`, `priority`,
+`due`, `mr`, `stage`, …) one at a time; it is not for the stamps or a removal, which stay with the
+status tool or the surgical edit.
 
 ⚠️ Write no second end date (`end`, `finished`, …). A project that already has one keeps
 reading it as a fallback when `done` is missing; new notes never get it.
 
 ⚠️ `milestone` names a note that must exist — the planning skill says where and how it looks. A
 mistyped id silently creates a milestone nobody planned: list the existing ids before writing one,
-and ask before inventing a new one.
+and ask before inventing a new one. A field tool that refuses an unknown milestone id does that
+check for you; its refusal lists the ids.
 
 The repo backend (§2b) keeps one file per task and no frontmatter: nothing here applies to it.
 
