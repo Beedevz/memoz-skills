@@ -99,6 +99,61 @@ export default {
       }
     },
     {
+      "name": "a four-backtick block holds a three-backtick line and a js-tagged line",
+      "note": "---\nstatus: doing\n---\n- [x] a\n````\n```\n- [ ] x\n```js\n- [ ] y\n````\n- [ ] b\n",
+      "expected": {
+        "done": 1,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a backtick block holds a tilde line",
+      "note": "---\nstatus: doing\n---\n```\n~~~\n- [ ] x\n```\n- [x] b\n",
+      "expected": {
+        "done": 1,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a tilde block holds a backtick line",
+      "note": "---\nstatus: doing\n---\n~~~\n```\n- [ ] x\n~~~\n- [x] b\n",
+      "expected": {
+        "done": 1,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a closer that carries an info string does not close",
+      "note": "---\nstatus: doing\n---\n```\n```js\n- [ ] x\n```\n- [x] b\n",
+      "expected": {
+        "done": 1,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a fence closes with CRLF line ends",
+      "note": "---\r\nstatus: doing\r\n---\r\n- [x] a\r\n```\r\n- [ ] x\r\n```\r\n- [ ] b\r\n",
+      "expected": {
+        "done": 1,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an unclosed fence runs to the end",
+      "note": "---\nstatus: doing\n---\n- [x] a\n```\n- [ ] x\n- [ ] y\n",
+      "expected": {
+        "done": 1,
+        "open": 0,
+        "waived": 0
+      }
+    }
+,
+    {
       "name": "a box in the frontmatter is not counted",
       "note": "---\nstatus: doing\nnote: |\n  - [ ] not a criterion\n---\n- [x] a\n",
       "expected": {
@@ -258,6 +313,37 @@ export default {
       "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-02 — real\n```\n- 2026-10-30 — sample\n```\n",
       "expected": "2026-10-02"
     },
+    {
+      "name": "a four-backtick block holds a three-backtick line and a js-tagged line",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-02 — real\n````\n```\n- 2026-10-30 — x\n```js\n- 2026-10-31 — y\n````\n",
+      "expected": "2026-10-02"
+    },
+    {
+      "name": "a backtick block holds a tilde line",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-02 — real\n```\n~~~\n- 2026-10-30 — x\n```\n",
+      "expected": "2026-10-02"
+    },
+    {
+      "name": "a tilde block holds a backtick line",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-02 — real\n~~~\n```\n- 2026-10-30 — x\n~~~\n",
+      "expected": "2026-10-02"
+    },
+    {
+      "name": "a closer that carries an info string does not close",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-02 — real\n```\n```js\n- 2026-10-30 — x\n```\n",
+      "expected": "2026-10-02"
+    },
+    {
+      "name": "a fence closes with CRLF line ends",
+      "note": "---\r\nstatus: doing\r\n---\r\n## Log\r\n- 2026-10-02 — real\r\n```\r\n- 2026-10-30 — x\r\n```\r\n- 2026-10-03 — after\r\n",
+      "expected": "2026-10-03"
+    },
+    {
+      "name": "an unclosed fence runs to the end",
+      "note": "---\nstatus: doing\n---\n## Log\n- 2026-10-02 — real\n```\n- 2026-10-30 — x\n",
+      "expected": "2026-10-02"
+    }
+,
     {
       "name": "no Log section",
       "note": "---\nstatus: doing\n---\n- 2026-10-02 — not in a log\n",

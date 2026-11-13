@@ -149,12 +149,50 @@ export const localDay = (ms: number): string => {
   return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`
 }
 
+// ── fenced code ──────────────────────────────────────────────────────────
+
+// ⚠️ A copy of the app's fence helpers (`nextFence`, CommonMark §4.5), not an
+// import. A block closes only on a run of its own character, at least as long
+// as the opener, with nothing after it but blanks: ```` is not closed by ```,
+// and ```js opens nothing inside a block. The caller drops leading whitespace
+// and a CRLF `\r`; the shared fixture keeps both copies equal.
+type Fence = { char: string; length: number }
+const LINE_BREAK = /[\r\u2028\u2029]/
+
+// The fence run a line starts with (up to 3 blanks, then 3+ backticks or 3+
+// tildes), or null. A plain scan: a regex back-tracked on a long run.
+const fenceRunOf = (line: string): (Fence & { rest: string }) | null => {
+  let start = 0
+  while (start < 3 && /\s/.test(line.charAt(start))) start++
+  const char = line.charAt(start)
+  if (char !== '`' && char !== '~') return null
+  let end = start
+  while (line.charAt(end) === char) end++
+  if (end - start < 3) return null
+  return { char, length: end - start, rest: line.slice(end) }
+}
+
+// The fence state after `line`, and whether `line` is fence markup or code
+// inside a fence (a reader skips it).
+const nextFence = (fence: Fence | null, line: string): { fence: Fence | null; skip: boolean } => {
+  const run = fenceRunOf(line)
+  if (fence !== null) {
+    const closes = run !== null && run.char === fence.char && run.length >= fence.length && /^[ \t]*$/.test(run.rest)
+    return { fence: closes ? null : fence, skip: true }
+  }
+  // A backtick fence's info string may not hold a backtick (that is inline
+  // code), and one with a line break opens nothing.
+  if (run === null || LINE_BREAK.test(run.rest) || (run.char === '`' && run.rest.includes('`'))) {
+    return { fence: null, skip: false }
+  }
+  return { fence: { char: run.char, length: run.length }, skip: true }
+}
+
 // ── the Log section: the newest dated line ───────────────────────────────
 
 // ⚠️ A copy of the app's reader (`lastLogDate`), not an import: the band is a
 // separate repository. The shared fixture (tests/band-fixture.ts) keeps the
 // two equal; change one, change the other.
-const LINE_BREAK = /[\r\u2028\u2029]/
 const LOG_ENTRY = /^\s*(?:[-*+]\s+)?(\d{4}-\d{2}-\d{2})(?!\d)/
 const LOG_HEADING = /^logs?\b/i
 const isBlank = (char: string | undefined): boolean => char === ' ' || char === '\t'
@@ -187,12 +225,12 @@ const logLevelAfter = (line: string, logLevel: number): number | null => {
 export const lastLogDate = (body: string): string | null => {
   let latest: string | null = null
   let logLevel = 0
-  let fence = false
+  let fence: Fence | null = null
   for (const raw of body.split('\n')) {
     const line = raw.replace(/\r$/, '')
-    const isFence = /^\s*(```|~~~)/.test(line)
-    if (isFence) fence = !fence
-    if (isFence || fence) continue
+    const step = nextFence(fence, line.trimStart())
+    fence = step.fence
+    if (step.skip) continue
     const level = logLevelAfter(line, logLevel)
     if (level !== null) {
       logLevel = level
@@ -271,14 +309,15 @@ export type BoxCounts = { done: number; open: number; waived: number }
 export const countBoxes = (body: string): BoxCounts => {
   const counts: BoxCounts = { done: 0, open: 0, waived: 0 }
   const ctx: BlockContext = { depth: 0, paragraph: false, offsets: [] }
-  let fence = false
+  let fence: Fence | null = null
   for (const line of body.split('\n')) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      fence = !fence
+    const step = nextFence(fence, line.trimStart().replace(/\r$/, ''))
+    fence = step.fence
+    if (step.skip) {
       ctx.paragraph = false
       continue
     }
-    if (fence || !isListItem(ctx, line)) continue
+    if (!isListItem(ctx, line)) continue
     const mark = CHECKBOX_LINE.exec(line)?.[2]
     if (mark === undefined) continue
     if (mark === ' ') counts.open++
