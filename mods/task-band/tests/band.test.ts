@@ -763,6 +763,15 @@ test('the Log reader is also reachable on a bare body', () => {
   expect(lastLogDate('')).toBeNull()
 })
 
+// Band-only fence cases (the fixture stays a byte copy of the app's): a backtick in a backtick
+// opener's info string makes the line inline code, and an info string with a line break opens nothing.
+test('a line that only looks like a fence opens nothing: the boxes and Log lines after it still count', () => {
+  for (const opener of ['``` `x`', '```js' + String.fromCharCode(0x2028)]) {
+    const parsed = parseNote(`---\nstatus: doing\n---\n${opener}\n- [ ] a\n## Log\n- 2026-10-02 — a\n`)
+    expect({ open: parsed.open, lastLog: parsed.lastLog }).toEqual({ open: 1, lastLog: '2026-10-02' })
+  }
+})
+
 // ── the task's change history ────────────────────────────────────────────
 
 type RawEvent = { id: string; t: string; path: string; key: string; old: unknown; new: unknown; writer: string }
