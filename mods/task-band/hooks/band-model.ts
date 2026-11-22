@@ -249,7 +249,11 @@ export const lastLogDate = (body: string): string | null => {
 // the note on `lastLogDate`. A box is a list item whose marker is `[ ]`, `[x]`,
 // `[X]` or `[~]` (waived); fenced code never counts, nor does indented code, nor
 // a numbered item that cannot interrupt a paragraph; blockquoted boxes do.
-const CHECKBOX_LINE = /^(\s*(?:>\s*)*(?:[-*+]|\d{1,9}[.)])\s+\[)([ xX~])(\]\s)/
+// The marker may end the line or run into text (`- [ ]x`). `](` or `][` after
+// it is a link, not a box, except `][[` (a wikilink). A gap of 5+ columns
+// after the list marker (tabs advance to the next multiple of 4) makes the
+// first line indented code: no box (see `openItem`).
+const CHECKBOX_LINE = /^(\s*(?:>\s*)*(?:[-*+]|\d{1,9}[.)])\s+\[)([ xX~])(\](?!\(|\[(?!\[)))/
 const BLOCK_PREFIX = /^([ \t]*)((?:>[ \t]?)*)/
 const LIST_MARKER = /^([-*+]|(\d{1,9})[.)])([ \t]+|$)/
 const THEMATIC_OR_HEADING = /^(?:#{1,6}(?:[ \t]|$)|([-*_])(?:[ \t]*\1){2,}[ \t]*$)/
@@ -270,10 +274,15 @@ const closeItems = (ctx: BlockContext, indent: number): void => {
   }
 }
 
-const openItem = (ctx: BlockContext, indent: number, marker: RegExpExecArray): void => {
+// Opens a list item. Returns false when its first line is indented code (a gap
+// of 5+ columns after the list marker, tabs advancing to the next multiple of
+// 4): the item exists but is no box, and it opens
+// no paragraph, so a following `2.` item can start.
+const openItem = (ctx: BlockContext, indent: number, marker: RegExpExecArray): boolean => {
   const gap = indentWidth(marker[3] ?? '', indent + (marker[1] ?? '').length)
   ctx.offsets.push(indent + (marker[1] ?? '').length + (gap >= 1 && gap <= 4 ? gap : 1))
-  ctx.paragraph = true
+  ctx.paragraph = gap <= 4
+  return gap <= 4
 }
 
 // Whether `rawLine` starts a list item, and the context that follows from it.
@@ -300,8 +309,7 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
     return false
   }
   if (ctx.paragraph && marker[2] !== undefined && Number(marker[2]) !== 1) return false // prose
-  openItem(ctx, indent, marker)
-  return true
+  return openItem(ctx, indent, marker)
 }
 
 export type BoxCounts = { done: number; open: number; waived: number }
