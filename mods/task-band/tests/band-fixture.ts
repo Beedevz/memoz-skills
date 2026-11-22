@@ -235,6 +235,60 @@ export default {
       }
     },
     {
+      "name": "an item that starts empty opens no paragraph, so a numbered item under it is a box",
+      "note": "---\nstatus: doing\n---\n-\n  2. [ ] y\n- [ ] z\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "`[x][]` with a defined label is a link, not a box",
+      "note": "---\nstatus: doing\n---\n[x]: https://example.com\n\n- [x][] b\n- [ ] c\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a marker followed only by spaces starts an empty item, so a numbered item under it is a box",
+      "note": "---\nstatus: doing\n---\n- \n  2. [ ] y\n- [ ] z\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty item that leaves the item above starts a new item, so a numbered item under it is a box",
+      "note": "---\nstatus: doing\n---\n+ [ ] a\n+\n  2. [ ] y\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a `-` alone under text is a setext underline: it opens no item, so a 5-space marker after it is code",
+      "note": "---\nstatus: doing\n---\ntext\n-\n     - [ ] x\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty item cannot interrupt a paragraph: the numbered item after it is prose",
+      "note": "---\nstatus: doing\n---\ntext\n+\n2. [ ] y\n\ntext\n1.\n2. [ ] w\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
       "name": "a box needs a space after the marker",
       "note": "---\nstatus: doing\n---\n-[ ] a\n- [ ] b\n",
       "expected": {
