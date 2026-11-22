@@ -368,6 +368,195 @@ export default {
         "open": 1,
         "waived": 1
       }
+    },
+    {
+      "name": "a marker directly after a marker opens a nested item: the inner marker is the box",
+      "note": "---\nstatus: doing\n---\n- - [ ] a\n1. - [x] b\n- - - [ ] c\n",
+      "expected": {
+        "done": 1,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a nested item's content sits at the inner marker's column",
+      "note": "---\nstatus: doing\n---\n- - [ ] a\n      - [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a setext `===` underline ends the paragraph, so a numbered item after it is a box",
+      "note": "---\nstatus: doing\n---\nTitle\n===\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a link reference definition ends the paragraph, so a numbered item after it is a box",
+      "note": "---\nstatus: doing\n---\n[a]: https://example.com\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a definition with its destination on the next line ends the paragraph",
+      "note": "---\nstatus: doing\n---\n[a]:\n  https://example.com\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a definition with its title on the next line ends the paragraph",
+      "note": "---\nstatus: doing\n---\n[a]: https://example.com\n'title'\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a definition whose title holds an escaped quote ends the paragraph",
+      "note": "---\nstatus: doing\n---\n[a]: https://example.com \"a \\\" b\"\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a definition whose label is an escaped bracket ends the paragraph",
+      "note": "---\nstatus: doing\n---\n[\\]]: https://example.com\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a definition under text is part of the paragraph",
+      "note": "---\nstatus: doing\n---\ntext\n[a]: https://example.com\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an undefined reference after the marker is a box",
+      "note": "---\nstatus: doing\n---\n- [ ][nope] a\n- [x][ok] b\n- [ ] c\n",
+      "expected": {
+        "done": 1,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an unclosed paren after the marker is a box",
+      "note": "---\nstatus: doing\n---\n- [x](wip a\n- [ ] b\n",
+      "expected": {
+        "done": 1,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a defined shortcut label makes the marker a link, even when defined after the box",
+      "note": "---\nstatus: doing\n---\n- [x] a\n\n[x]: https://example.com\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a failed inline tail or label falls back to a defined shortcut label: a link",
+      "note": "---\nstatus: doing\n---\n[x]: https://example.com\n\n- [x](wip a\n- [x][ a\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "labels fold case like the renderer",
+      "note": "---\nstatus: doing\n---\n[STRASSE]: https://example.com\n\n- [ ][straße] a\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an inline link with nested parens, an escaped title quote, or a tail over two lines is a link",
+      "note": "---\nstatus: doing\n---\n- [ ](a(b(c))) a\n- [x](https://example.com \"a \\\" b\") b\n- [x](https://example.com\n  \"t\") c\n- [ ] d\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "unbalanced nested parens make no link",
+      "note": "---\nstatus: doing\n---\n- [x](a(b) c\n- [ ] d\n",
+      "expected": {
+        "done": 1,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a spaced rule is a rule, not nested items: code under it is no box",
+      "note": "---\nstatus: doing\n---\n- [ ] a\n- - -\n      - [ ] b\n- [ ] c\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a rule inside a nested item opens no deeper item",
+      "note": "---\nstatus: doing\n---\n- * * *\n      - [ ] b\n- [ ] c\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "text right after a blockquote is its lazy line and holds no paragraph: a numbered item under it is a box",
+      "note": "---\nstatus: doing\n---\n> a\nlazy\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a `===` right after a blockquote is no setext underline: the numbered item under it is a box",
+      "note": "---\nstatus: doing\n---\n> a\n===\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a blockquoted link whose paren closes on the next line",
+      "note": "---\nstatus: doing\n---\n> - [x](https://example.com\n> ) a\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
     }
   ],
   "logCases": [
