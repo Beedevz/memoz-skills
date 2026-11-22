@@ -172,8 +172,62 @@ export default {
       }
     },
     {
-      "name": "a box needs whitespace after the closing bracket",
+      "name": "a marker that ends the line is a box, CRLF too",
+      "note": "---\nstatus: doing\n---\n- [ ]\n- [x]\n- [ ]\r\n",
+      "expected": {
+        "done": 1,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a marker that runs into text is a box",
       "note": "---\nstatus: doing\n---\n- [ ]x\n- [x]y\n- [ ] ok\n",
+      "expected": {
+        "done": 1,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "5+ spaces after the list marker is indented code, not a box; 4 is still a box",
+      "note": "---\nstatus: doing\n---\n-     [ ] code\n1.     [x] code\n-    [ ] four spaces\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "the gap after the list marker is measured in columns: two tabs reach column 8, indented code, not a box",
+      "note": "---\nstatus: doing\n---\n-\t\t[ ] code\n-\t[ ] one tab\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an indented-code first line opens no paragraph, so a following numbered item is a box",
+      "note": "---\nstatus: doing\n---\n-     [x] code\n  2. [ ] y\n- [ ] z\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a wikilink right after the marker is a box",
+      "note": "---\nstatus: doing\n---\n- [ ][[Note]]\n- [x][[Note|alias]] a\n",
+      "expected": {
+        "done": 1,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a link right after the marker is not a box: an inline link and a defined reference",
+      "note": "---\nstatus: doing\n---\n- [x](https://example.com) link\n- [ ][ref] link\n- [ ] ok\n\n[ref]: https://example.com\n",
       "expected": {
         "done": 0,
         "open": 1,
