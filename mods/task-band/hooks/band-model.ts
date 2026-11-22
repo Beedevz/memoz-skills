@@ -250,7 +250,10 @@ export const lastLogDate = (body: string): string | null => {
 // `[X]` or `[~]` (waived); fenced code never counts, nor does indented code, nor
 // a numbered item that cannot interrupt a paragraph; blockquoted boxes do.
 // The marker may end the line or run into text (`- [ ]x`). `](` or `][` after
-// it is a link, not a box, except `][[` (a wikilink). A gap of 5+ columns
+// it is a link, not a box, except `][[` (a wikilink). Known limits (need
+// link-definition knowledge): an undefined reference (`[ ][nope]`, `[x][]`), a
+// blank or unclosed label (`[ ][]`, `[ ][ ]`, `[ ][`) and an unclosed paren
+// (`[x](wip`) draw a box this rule skips. A gap of 5+ columns
 // after the list marker (tabs advance to the next multiple of 4) makes the
 // first line indented code: no box (see `openItem`).
 const CHECKBOX_LINE = /^(\s*(?:>\s*)*(?:[-*+]|\d{1,9}[.)])\s+\[)([ xX~])(\](?!\(|\[(?!\[)))/
@@ -277,11 +280,12 @@ const closeItems = (ctx: BlockContext, indent: number): void => {
 // Opens a list item. Returns false when its first line is indented code (a gap
 // of 5+ columns after the list marker, tabs advancing to the next multiple of
 // 4): the item exists but is no box, and it opens
-// no paragraph, so a following `2.` item can start.
-const openItem = (ctx: BlockContext, indent: number, marker: RegExpExecArray): boolean => {
-  const gap = indentWidth(marker[3] ?? '', indent + (marker[1] ?? '').length)
+// no paragraph, so a following `2.` item can start. An item whose first line is
+// empty (the marker ends the line, trailing blanks too) opens no paragraph either.
+const openItem = (ctx: BlockContext, indent: number, marker: RegExpExecArray, empty: boolean): boolean => {
+  const gap = empty ? 0 : indentWidth(marker[3] ?? '', indent + (marker[1] ?? '').length)
   ctx.offsets.push(indent + (marker[1] ?? '').length + (gap >= 1 && gap <= 4 ? gap : 1))
-  ctx.paragraph = gap <= 4
+  ctx.paragraph = gap >= 1 && gap <= 4
   return gap <= 4
 }
 
@@ -299,17 +303,37 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
   }
   const indent = indentWidth(text.slice(0, text.length - content.length))
   const marker = LIST_MARKER.exec(content)
-  const textLine = !marker && !THEMATIC_OR_HEADING.test(content)
+  // Decided before `closeItems` below changes the open items.
+  const role = lineRole(ctx, indent, marker, content)
+  const textLine = role === 'text'
   // A plain text line under an open paragraph continues it and keeps its items open.
   if (!(ctx.paragraph && textLine)) closeItems(ctx, indent)
   // Indented code, or a continuation of the open paragraph.
   if (indent - (ctx.offsets.at(-1) ?? 0) >= 4) return false
-  if (!marker) {
+  // A text line keeps or opens a paragraph; a heading, rule or setext underline
+  // ends it.
+  if (!marker || role !== 'item') {
     ctx.paragraph = textLine
     return false
   }
   if (ctx.paragraph && marker[2] !== undefined && Number(marker[2]) !== 1) return false // prose
-  return openItem(ctx, indent, marker)
+  return openItem(ctx, indent, marker, (marker[0] ?? '').length === content.length)
+}
+
+// What a line is: a list item, paragraph text, or a break (heading, rule,
+// setext underline). An empty item (the marker ends the line) cannot interrupt
+// a paragraph it sits inside: there `+` / `*` / `1.` alone is more of its text
+// and `-` alone is a setext underline. Left of the open item it is an item.
+const lineRole = (
+  ctx: BlockContext,
+  indent: number,
+  marker: RegExpExecArray | null,
+  content: string,
+): 'item' | 'text' | 'break' => {
+  if (!marker) return THEMATIC_OR_HEADING.test(content) ? 'break' : 'text'
+  if ((marker[0] ?? '').length !== content.length || !ctx.paragraph) return 'item'
+  if (indent < (ctx.offsets.at(-1) ?? 0)) return 'item'
+  return marker[1] === '-' ? 'break' : 'text'
 }
 
 export type BoxCounts = { done: number; open: number; waived: number }
