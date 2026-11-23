@@ -1,8 +1,8 @@
 // Shared fixture for the task band's box counter, Log reader, frontmatter reader and last-touch rule (with and without the task's change history) and history reader (raw history events: expected touch day and deleted mark per task path): note texts and events with the expected result.
 //
-// SOURCE OF TRUTH: the memoz-skills repository, mods/task-band/tests/band-fixture.ts. The Memoz app keeps a
-// BYTE-IDENTICAL copy and runs its own box counter, Log reader, frontmatter reader and last-touch rule over it; the band's tests run over this
-// file too. Keeping the two copies equal is by hand: change one, change the other.
+// SOURCE OF TRUTH: the memoz-skills repository, mods/task-band/tests/band-fixture.ts. The Memoz app generates its
+// copy from a pinned commit of this file and runs its own box counter, Log reader, frontmatter reader and last-touch rule over it; the band's tests run over this
+// file too. Change the fixture here only; the app picks the change up when it moves its pin.
 // A case with a `zone` is a case about the device's local day: a runner that can set the time zone sets it for that case; one that cannot runs the case only when the device is in that zone.
 // The file is code, not JSON, because a mod test can import only code-named files.
 
