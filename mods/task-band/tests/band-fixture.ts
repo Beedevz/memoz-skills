@@ -836,6 +836,96 @@ export default {
         "open": 0,
         "waived": 0
       }
+    },
+    {
+      "name": "an empty item ends at a blank line: a marker 4 columns in is code",
+      "note": "---\nstatus: doing\n---\n-\n\n    - [ ] x\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty item ends at a blank line: a numbered marker 4 columns in is code",
+      "note": "---\nstatus: doing\n---\n-\n\n    2. [ ] x\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a two-dash setext underline closes the paragraph: a numbered box after it counts",
+      "note": "---\nstatus: doing\n---\ntext\n--\n2. [ ] y\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a `===` setext underline closes the paragraph: a numbered box after it counts",
+      "note": "---\nstatus: doing\n---\ntext\n===\n2. [ ] y\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a definition in a done list item is not a box",
+      "note": "---\nstatus: doing\n---\n- [x]: https://a.b\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a blank-label `- [ ]: url` is no definition: it is a box",
+      "note": "---\nstatus: doing\n---\n- [ ]: https://a.b\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "`- [x]:` followed by text is not a definition: it is a box",
+      "note": "---\nstatus: doing\n---\n- [x]: shipped today\n",
+      "expected": {
+        "done": 1,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a defined `[x]` label at the end of a line is a link",
+      "note": "---\nstatus: doing\n---\n[x]: http://a\n\n- [x]\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a blank `[ ][]` after the marker is a box",
+      "note": "---\nstatus: doing\n---\n- [ ][] a\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an undefined `[x][]` after the marker is a box",
+      "note": "---\nstatus: doing\n---\n- [x][] a\n",
+      "expected": {
+        "done": 1,
+        "open": 0,
+        "waived": 0
+      }
     }
   ],
   "logCases": [
