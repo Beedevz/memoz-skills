@@ -258,7 +258,7 @@ export const lastLogDate = (body: string): string | null => {
 // reference, a broken label or an unclosed paren is a box; `][[` is a link only
 // through a defined shortcut `[x]` (a wikilink is flattened to text first). A gap of 5+ columns after the list
 // marker (tabs advance to the next multiple of 4) makes the first line indented
-// code: no box (see `openItem`). A setext `===` underline and a link reference
+// code: no box (see `openItem`). A setext underline of any length (`===`, `--`) and a link reference
 // definition (one line, or `[a]:` with the destination, and a title, on the
 // next lines) end the paragraph; a spaced rule (`- - -`) is a rule, not nested
 // items; text right after a blockquote is its lazy line and holds no paragraph.
@@ -266,7 +266,8 @@ export const lastLogDate = (body: string): string | null => {
 // box there is no box.
 // An item whose first line is empty (`-` alone) takes its text from the next
 // line when that sits at the item's content column (a blank line between, or a
-// line left of the column, ends the item): a box there is a box.
+// line left of the column, ends the item): a box there is a box. An empty item
+// also ends at a blank line, so a marker 4+ columns in after the blank is code.
 // Known limits (each needs a full parser): a multi-line definition (`[a]:` with its
 // destination on the next line) at the start of an item or under an empty first line;
 // a blank line after a definition-only first block (the page keeps the item open);
@@ -277,7 +278,6 @@ const CHECKBOX_LINE = /^([ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)*(?:[-
 const CONTINUATION_BOX = /^([ \t]*(?:>[ \t]*)*\[)([ xX~])(\])/
 const BLOCK_PREFIX = /^([ \t]*)((?:>[ \t]?)*)/
 const LIST_MARKER = /^([-*+]|(\d{1,9})[.)])([ \t]+|$)/
-const HEADING_EQUALS = /^=+[ \t]*$/
 const HEADING_UNDERLINE = /^(?:=+|-+)[ \t]*$/
 // One bounded class (999 characters, as in CommonMark): a repeated group around a
 // required one backtracks quadratically on a long line that starts with `[`. A
@@ -313,6 +313,8 @@ type BlockContext = {
   empty: number
   // The last line is the first text line of an empty item: a box may start it without a marker.
   cont: boolean
+  // The last line was a marker alone on its line: the empty item it opened ends at a blank line.
+  bare: boolean
 }
 
 // `re.exec(text)` where group 1 (the label) is not blank.
@@ -365,13 +367,22 @@ const startDefinition = (ctx: BlockContext, content: string): boolean => {
   return definition !== null
 }
 
+// A blank line closes the paragraph, and the empty item the last line opened: a marker
+// 4+ columns in after it is indented code.
+const blankLine = (ctx: BlockContext, wasBare: boolean): false => {
+  ctx.paragraph = false
+  if (wasBare) ctx.offsets.pop()
+  return false
+}
+
 // Whether `rawLine` starts a list item, and the context that follows from it.
 const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
   ctx.definition = undefined
   const { opener, titleNext } = ctx
   let lazy = ctx.lazy
   const pending = ctx.empty
-  Object.assign(ctx, { opener: undefined, titleNext: false, lazy: false, started: false, heading: false, empty: 0, cont: false })
+  const wasBare = ctx.bare
+  Object.assign(ctx, { opener: undefined, titleNext: false, lazy: false, started: false, heading: false, empty: 0, cont: false, bare: false })
   const line = rawLine.replace(/\r$/, '')
   const prefix = BLOCK_PREFIX.exec(line) as RegExpExecArray
   const quoteDepth = ((prefix[2] ?? '').match(/>/g) ?? []).length
@@ -382,10 +393,7 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
   }
   const text = quoteDepth > 0 ? line.slice(prefix[0].length) : line
   const content = text.trimStart()
-  if (content === '') {
-    ctx.paragraph = false
-    return false
-  }
+  if (content === '') return blankLine(ctx, wasBare)
   const indent = indentWidth(text.slice(0, text.length - content.length))
   const marker = LIST_MARKER.exec(content)
   // The destination (and title) of a definition that began on an earlier line.
@@ -445,6 +453,7 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
   // The marker was alone on its line: the item's text, if any, starts on the next one.
   // A one-line definition after the marker is no text either: the same goes for the line after it.
   if (open && (rest === '' || defined)) ctx.empty = ctx.offsets.at(-1) ?? 0
+  ctx.bare = open && rest === ''
   return open
 }
 
@@ -459,8 +468,8 @@ const lineRole = (
   content: string,
 ): 'item' | 'text' | 'break' => {
   if (!marker) {
-    // `===` under an open paragraph of the same container is a setext underline.
-    if (ctx.paragraph && indent >= (ctx.offsets.at(-1) ?? 0) && HEADING_EQUALS.test(content)) return 'break'
+    // `===` or `--` (of any length) under an open paragraph of the same container is a setext underline.
+    if (ctx.paragraph && indent >= (ctx.offsets.at(-1) ?? 0) && HEADING_UNDERLINE.test(content)) return 'break'
     return THEMATIC_OR_HEADING.test(content) ? 'break' : 'text'
   }
   if (THEMATIC_BREAK.test(content)) return 'break'
@@ -550,6 +559,13 @@ const isLinkTail = (rest: string, mark: string, definitions: ReadonlySet<string>
   return definitions.has(normalizeLabel(mark))
 }
 
+// The context after a fence line: a fence opening left of an open item's content column ends the
+// item (one inside it stays inside).
+const skipFenceLine = (ctx: BlockContext, line: string, opening: boolean): void => {
+  if (opening) closeItems(ctx, indentWidth(line.slice(0, line.length - line.trimStart().length)))
+  Object.assign(ctx, { paragraph: false, opener: undefined, titleNext: false, lazy: false, empty: 0, bare: false })
+}
+
 export type BoxCounts = { done: number; open: number; waived: number }
 
 export const countBoxes = (body: string): BoxCounts => {
@@ -558,14 +574,15 @@ export const countBoxes = (body: string): BoxCounts => {
   // The box on the line that opened the current paragraph, if it has one.
   let first: (typeof found)[number] | undefined
   const definitions = new Set<string>()
-  const ctx: BlockContext = { depth: 0, paragraph: false, offsets: [], titleNext: false, lazy: false, started: false, heading: false, empty: 0, cont: false }
+  const ctx: BlockContext = { depth: 0, paragraph: false, offsets: [], titleNext: false, lazy: false, started: false, heading: false, empty: 0, cont: false, bare: false }
   let fence: Fence | null = null
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] as string
+    const opening = fence === null
     const step = nextFence(fence, line.trimStart().replace(/\r$/, ''))
     fence = step.fence
     if (step.skip) {
-      Object.assign(ctx, { paragraph: false, opener: undefined, titleNext: false, lazy: false, empty: 0 })
+      skipFenceLine(ctx, line, opening)
       continue
     }
     const item = isListItem(ctx, line)
