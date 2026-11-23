@@ -388,6 +388,24 @@ export default {
       }
     },
     {
+      "name": "a definition on the marker line leaves the next line as the item's first text line",
+      "note": "---\nstatus: doing\n---\n- [a]: http://x\n  [ ] y\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a title on its own line after a definition under an empty first line keeps the item's state",
+      "note": "---\nstatus: doing\n---\n-\n  [a]: http://x\n  \"t\"\n  [ ] y\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
       "name": "`[x][]` with a defined label is a link, not a box",
       "note": "---\nstatus: doing\n---\n[x]: https://example.com\n\n- [x][] b\n- [ ] c\n",
       "expected": {

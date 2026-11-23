@@ -391,11 +391,14 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
     const dest = DEFINITION_DEST_LINE.exec(content)
     if (dest) {
       Object.assign(ctx, { definition: opener, paragraph: false, titleNext: dest[1] === undefined })
+      if (pending > 0 && indent >= pending) ctx.empty = pending
       return false
     }
   }
   if (!marker && titleNext && DEFINITION_TITLE_LINE.test(content)) {
     ctx.paragraph = false
+    // A title on its own line after a definition under an empty first line: still no text.
+    if (pending > 0 && indent >= pending) ctx.empty = pending
     return false
   }
   // Decided before `closeItems` below changes the open items.
@@ -433,10 +436,12 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
     inner = open ? LIST_MARKER.exec(rest) : null
   }
   // A rule inside the item is no paragraph; neither is a definition (a block start, after the marker too).
-  if (THEMATIC_BREAK.test(rest) || (open && startDefinition(ctx, rest))) ctx.paragraph = false
+  const defined = open && startDefinition(ctx, rest)
+  if (THEMATIC_BREAK.test(rest) || defined) ctx.paragraph = false
   ctx.started = ctx.paragraph
   // The marker was alone on its line: the item's text, if any, starts on the next one.
-  if (open && rest === '') ctx.empty = ctx.offsets.at(-1) ?? 0
+  // A one-line definition after the marker is no text either: the same goes for the line after it.
+  if (open && (rest === '' || defined)) ctx.empty = ctx.offsets.at(-1) ?? 0
   return open
 }
 
