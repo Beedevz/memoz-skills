@@ -559,6 +559,13 @@ const isLinkTail = (rest: string, mark: string, definitions: ReadonlySet<string>
   return definitions.has(normalizeLabel(mark))
 }
 
+// The context after a fence line: a fence opening left of an open item's content column ends the
+// item (one inside it stays inside).
+const skipFenceLine = (ctx: BlockContext, line: string, opening: boolean): void => {
+  if (opening) closeItems(ctx, indentWidth(line.slice(0, line.length - line.trimStart().length)))
+  Object.assign(ctx, { paragraph: false, opener: undefined, titleNext: false, lazy: false, empty: 0, bare: false })
+}
+
 export type BoxCounts = { done: number; open: number; waived: number }
 
 export const countBoxes = (body: string): BoxCounts => {
@@ -572,13 +579,10 @@ export const countBoxes = (body: string): BoxCounts => {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] as string
     const opening = fence === null
-    const bare = line.trimStart().replace(/\r$/, '')
-    const step = nextFence(fence, bare)
+    const step = nextFence(fence, line.trimStart().replace(/\r$/, ''))
     fence = step.fence
     if (step.skip) {
-      // A fence left of an open item's content column ends the item (a fence inside it stays inside).
-      if (opening) closeItems(ctx, indentWidth(line.slice(0, line.length - line.trimStart().length)))
-      Object.assign(ctx, { paragraph: false, opener: undefined, titleNext: false, lazy: false, empty: 0, bare: false })
+      skipFenceLine(ctx, line, opening)
       continue
     }
     const item = isListItem(ctx, line)
