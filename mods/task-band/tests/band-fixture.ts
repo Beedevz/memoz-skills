@@ -244,6 +244,114 @@ export default {
       }
     },
     {
+      "name": "an item whose first line is empty takes its box from the next line, at the content column",
+      "note": "---\nstatus: doing\n---\n-\n  [ ] x\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty-first-line item with a done box on the next line",
+      "note": "---\nstatus: doing\n---\n-\n  [x] x\n- [ ] b\n",
+      "expected": {
+        "done": 1,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty-first-line item: 5 spaces (3 past the content column) is still a paragraph, 6 is code",
+      "note": "---\nstatus: doing\n---\n-\n     [ ] x\n-\n      [ ] y\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty-first-line item: a blank line before the text ends the item, no box",
+      "note": "---\nstatus: doing\n---\n-\n\n  [ ] x\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty-first-line item: a line left of the content column is no part of it",
+      "note": "---\nstatus: doing\n---\n-\n [ ] x\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty-first-line item in a blockquote",
+      "note": "---\nstatus: doing\n---\n> -\n>   [ ] x\n> - [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a nested empty item takes its box at the inner content column, not left of it",
+      "note": "---\nstatus: doing\n---\n- -\n    [ ] x\n- -\n   [ ] y\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty-first-line item: only its first text line carries the box",
+      "note": "---\nstatus: doing\n---\n-\n  [ ] x\n  [ ] y\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty-first-line item whose text is underlined by a setext rule is a heading, no box",
+      "note": "---\nstatus: doing\n---\n-\n  [ ] x\n  ===\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a text line under a non-empty item is its paragraph's continuation, no box",
+      "note": "---\nstatus: doing\n---\n- a\n  [ ] y\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an empty item followed by a nested item: the inner marker is the box",
+      "note": "---\nstatus: doing\n---\n-\n  - [ ] x\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a fence between an empty item and the text ends the item, no box",
+      "note": "---\nstatus: doing\n---\n-\n```\nc\n```\n  [ ] x\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
       "name": "`[x][]` with a defined label is a link, not a box",
       "note": "---\nstatus: doing\n---\n[x]: https://example.com\n\n- [x][] b\n- [ ] c\n",
       "expected": {
