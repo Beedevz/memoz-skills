@@ -557,6 +557,105 @@ export default {
         "open": 1,
         "waived": 0
       }
+    },
+    {
+      "name": "a `===` underline turns the box line into a heading: no box",
+      "note": "---\nstatus: doing\n---\n- [ ] a\n  ===\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a `---` underline turns a box line into a heading, and the numbered item under it is a box",
+      "note": "---\nstatus: doing\n---\n- [ ] a\n  ---\n  2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a setext heading closing a multi-line paragraph drops the first line's box",
+      "note": "---\nstatus: doing\n---\n- [ ] a\n  more\n  ===\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a `===` outside the item is a lazy line: the box stays",
+      "note": "---\nstatus: doing\n---\n- [ ] a\n===\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a link is not joined across a quote depth",
+      "note": "---\nstatus: doing\n---\n- [x](https://example.com\n> \"t\")\n- [ ] b\n",
+      "expected": {
+        "done": 1,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a link title is not joined across a new list item",
+      "note": "---\nstatus: doing\n---\n- [x](https://example.com \"t\n- [ ] b\")\n",
+      "expected": {
+        "done": 1,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a defined `[x]` makes `][[` a link",
+      "note": "---\nstatus: doing\n---\n[x]: http://example.com\n\n- [x][[Note]] a\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a no-break space after the marker is not a separator: no box",
+      "note": "---\nstatus: doing\n---\n- [ ] a\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a no-break space after a nested marker is not a separator",
+      "note": "---\nstatus: doing\n---\n- - [ ] a\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a label with an unescaped `[` is no definition: the numbered item stays prose",
+      "note": "---\nstatus: doing\n---\n[a[b]: http://example.com\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a blank label is no definition",
+      "note": "---\nstatus: doing\n---\n[ ]: http://example.com\n2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
     }
   ],
   "logCases": [

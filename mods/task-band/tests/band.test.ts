@@ -18,6 +18,7 @@ import {
   lastTouch,
   localDay,
   parseHistoryFile,
+  countBoxes,
   parseNote,
   priorityText,
   resolveStalledDays,
@@ -708,6 +709,13 @@ describe('shared fixture (tests/band-fixture.ts, the Memoz app keeps a copy)', (
       expect({ done: parsed.done, open: parsed.open, waived: parsed.waived }).toEqual(expected)
     })
   }
+
+  test('a long line that starts with `[` is read in linear time', () => {
+    // a quadratic label pattern took seconds at 64k characters; the bound is generous, not a benchmark
+    const started = Date.now()
+    countBoxes('[' + 'a'.repeat(64000) + '\n2. [ ] q\n')
+    expect(Date.now() - started).toBeLessThan(500)
+  })
 
   for (const { name, note: text, expected } of fixture.logCases) {
     test(`log: ${name}`, () => {
