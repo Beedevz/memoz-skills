@@ -352,6 +352,42 @@ export default {
       }
     },
     {
+      "name": "an escaped bracket is literal text, not a box",
+      "note": "---\nstatus: doing\n---\n- \\[ ] x\n- [ ] y\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an escaped bracket on an empty item's text line is not a box",
+      "note": "---\nstatus: doing\n---\n-\n  \\[ ] x\n- [ ] y\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a definition opening a list item leaves no paragraph: the `2.` item is a box",
+      "note": "---\nstatus: doing\n---\n- [a]: http://x\n  2. [ ] q\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a definition under an empty first line: the next line is still the item's first text line",
+      "note": "---\nstatus: doing\n---\n-\n  [a]: http://x\n  [ ] y\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
       "name": "`[x][]` with a defined label is a link, not a box",
       "note": "---\nstatus: doing\n---\n[x]: https://example.com\n\n- [x][] b\n- [ ] c\n",
       "expected": {
