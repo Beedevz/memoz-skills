@@ -249,19 +249,65 @@ export const lastLogDate = (body: string): string | null => {
 // the note on `lastLogDate`. A box is a list item whose marker is `[ ]`, `[x]`,
 // `[X]` or `[~]` (waived); fenced code never counts, nor does indented code, nor
 // a numbered item that cannot interrupt a paragraph; blockquoted boxes do.
-// The marker may end the line or run into text (`- [ ]x`). `](` or `][` after
-// it is a link, not a box, except `][[` (a wikilink). Known limits (need
-// link-definition knowledge): an undefined reference (`[ ][nope]`, `[x][]`), a
-// blank or unclosed label (`[ ][]`, `[ ][ ]`, `[ ][`) and an unclosed paren
-// (`[x](wip`) draw a box this rule skips. A gap of 5+ columns
-// after the list marker (tabs advance to the next multiple of 4) makes the
-// first line indented code: no box (see `openItem`).
-const CHECKBOX_LINE = /^(\s*(?:>\s*)*(?:[-*+]|\d{1,9}[.)])\s+\[)([ xX~])(\](?!\(|\[(?!\[)))/
+// The marker may end the line or run into text (`- [ ]x`). A marker directly
+// after another (`- - [ ] x`) opens a nested item: the inner marker is tested.
+// What follows the marker decides box or link, once the whole note is read
+// (`isLinkTail`): a well-formed inline `(dest "title")` (any paren depth,
+// escapes, over lines), a `[label]` / `[]` naming a defined label, or a defined
+// shortcut `[x]` (what a malformed tail falls back to) is a link; an undefined
+// reference, a broken label or an unclosed paren is a box; `][[` is a link only
+// through a defined shortcut `[x]` (a wikilink is flattened to text first). A gap of 5+ columns after the list
+// marker (tabs advance to the next multiple of 4) makes the first line indented
+// code: no box (see `openItem`). A setext `===` underline and a link reference
+// definition (one line, or `[a]:` with the destination, and a title, on the
+// next lines) end the paragraph; a spaced rule (`- - -`) is a rule, not nested
+// items; text right after a blockquote is its lazy line and holds no paragraph.
+// A setext underline also turns the paragraph's first line into heading text: a
+// box there is no box.
+// Known limits (each needs a full parser): a definition opening a list item
+// (`- [a]: x`), a link spanning more than `LINK_MAX_LINES` lines.
+const CHECKBOX_LINE = /^([ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)*(?:[-*+]|\d{1,9}[.)])[ \t]+\[)([ xX~])(\])/
 const BLOCK_PREFIX = /^([ \t]*)((?:>[ \t]?)*)/
 const LIST_MARKER = /^([-*+]|(\d{1,9})[.)])([ \t]+|$)/
+const HEADING_EQUALS = /^=+[ \t]*$/
+const HEADING_UNDERLINE = /^(?:=+|-+)[ \t]*$/
+// One bounded class (999 characters, as in CommonMark): a repeated group around a
+// required one backtracks quadratically on a long line that starts with `[`. A
+// blank label is refused in code (`labelMatch`).
+const DEFINITION_LABEL = '\\[((?:\\\\.|[^\\[\\]\\\\]){1,999})\\]:'
+const DEFINITION_DEST = '(?:<[^<>]*>|[^\\s<]\\S*)'
+const DEFINITION_TITLE = '(?:"(?:[^"\\\\]|\\\\.)*"|\'(?:[^\'\\\\]|\\\\.)*\'|\\((?:[^()\\\\]|\\\\.)*\\))'
+const LINK_DEFINITION = new RegExp(`^${DEFINITION_LABEL}[ \\t]*${DEFINITION_DEST}([ \\t]+${DEFINITION_TITLE})?[ \\t]*$`)
+const DEFINITION_OPENER = new RegExp(`^${DEFINITION_LABEL}[ \\t]*$`)
+const DEFINITION_DEST_LINE = new RegExp(`^${DEFINITION_DEST}([ \\t]+${DEFINITION_TITLE})?[ \\t]*$`)
+const DEFINITION_TITLE_LINE = new RegExp(`^${DEFINITION_TITLE}[ \\t]*$`)
+const LABEL_TAIL = /^\[((?:\\.|[^[\]\\])*)\]/
+const THEMATIC_BREAK = /^([-*_])(?:[ \t]*\1){2,}[ \t]*$/
 const THEMATIC_OR_HEADING = /^(?:#{1,6}(?:[ \t]|$)|([-*_])(?:[ \t]*\1){2,}[ \t]*$)/
 
-type BlockContext = { depth: number; paragraph: boolean; offsets: number[] }
+type BlockContext = {
+  depth: number
+  paragraph: boolean
+  offsets: number[]
+  // The normalized label of the definition the last line was.
+  definition?: string
+  // The label of a `[label]:` line whose destination must be on this line.
+  opener?: string
+  // The last line completed a definition without a title: a title line may follow.
+  titleNext: boolean
+  // The last line was a lazy continuation of a blockquote paragraph.
+  lazy: boolean
+  // The last line opened a paragraph.
+  started: boolean
+  // The last line was a setext underline: the open paragraph became a heading.
+  heading: boolean
+}
+
+// `re.exec(text)` where group 1 (the label) is not blank.
+const labelMatch = (re: RegExp, text: string): RegExpExecArray | null => {
+  const m = re.exec(text)
+  return m && (m[1] ?? '').trim() !== '' ? m : null
+}
 
 // Width of `ws` starting at column `from`; a tab goes to the next multiple of 4.
 const indentWidth = (ws: string, from = 0): number => {
@@ -269,6 +315,10 @@ const indentWidth = (ws: string, from = 0): number => {
   for (const char of ws) width += char === '\t' ? 4 - (width % 4) : 1
   return width - from
 }
+
+// A link label as the renderer matches it: trimmed, inner whitespace collapsed,
+// case-folded both ways (`ß` and `SS` meet).
+const normalizeLabel = (label: string): string => label.trim().replace(/\s+/g, ' ').toLowerCase().toUpperCase()
 
 const closeItems = (ctx: BlockContext, indent: number): void => {
   while (indent < (ctx.offsets.at(-1) ?? 0)) {
@@ -291,10 +341,18 @@ const openItem = (ctx: BlockContext, indent: number, marker: RegExpExecArray, em
 
 // Whether `rawLine` starts a list item, and the context that follows from it.
 const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
+  ctx.definition = undefined
+  const { opener, titleNext } = ctx
+  let lazy = ctx.lazy
+  Object.assign(ctx, { opener: undefined, titleNext: false, lazy: false, started: false, heading: false })
   const line = rawLine.replace(/\r$/, '')
   const prefix = BLOCK_PREFIX.exec(line) as RegExpExecArray
   const quoteDepth = ((prefix[2] ?? '').match(/>/g) ?? []).length
-  if (quoteDepth !== ctx.depth) Object.assign(ctx, { depth: quoteDepth, paragraph: false, offsets: [] })
+  if (quoteDepth !== ctx.depth) {
+    // Leaving a quote with a paragraph open: a text line here is its lazy continuation.
+    lazy = quoteDepth < ctx.depth && ctx.paragraph
+    Object.assign(ctx, { depth: quoteDepth, paragraph: false, offsets: [] })
+  }
   const text = quoteDepth > 0 ? line.slice(prefix[0].length) : line
   const content = text.trimStart()
   if (content === '') {
@@ -303,6 +361,18 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
   }
   const indent = indentWidth(text.slice(0, text.length - content.length))
   const marker = LIST_MARKER.exec(content)
+  // The destination (and title) of a definition that began on an earlier line.
+  if (!marker && opener !== undefined && !THEMATIC_OR_HEADING.test(content)) {
+    const dest = DEFINITION_DEST_LINE.exec(content)
+    if (dest) {
+      Object.assign(ctx, { definition: opener, paragraph: false, titleNext: dest[1] === undefined })
+      return false
+    }
+  }
+  if (!marker && titleNext && DEFINITION_TITLE_LINE.test(content)) {
+    ctx.paragraph = false
+    return false
+  }
   // Decided before `closeItems` below changes the open items.
   const role = lineRole(ctx, indent, marker, content)
   const textLine = role === 'text'
@@ -311,13 +381,34 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
   // Indented code, or a continuation of the open paragraph.
   if (indent - (ctx.offsets.at(-1) ?? 0) >= 4) return false
   // A text line keeps or opens a paragraph; a heading, rule or setext underline
-  // ends it.
+  // ends it; a definition at a block start opens none.
   if (!marker || role !== 'item') {
-    ctx.paragraph = textLine
+    const lazyText = textLine && lazy
+    const blockStart = textLine && !ctx.paragraph && !lazyText
+    // `===` / `---` under an open paragraph of its own container turns it into a heading.
+    ctx.heading = role === 'break' && ctx.paragraph && indent >= (ctx.offsets.at(-1) ?? 0) && HEADING_UNDERLINE.test(content)
+    const definition = blockStart ? labelMatch(LINK_DEFINITION, content) : null
+    if (definition) Object.assign(ctx, { definition: normalizeLabel(definition[1] ?? ''), titleNext: definition[2] === undefined })
+    else if (blockStart) ctx.opener = normalizeLabel(labelMatch(DEFINITION_OPENER, content)?.[1] ?? '') || undefined
+    ctx.lazy = lazyText
+    ctx.paragraph = textLine && !definition && !lazyText
+    ctx.started = blockStart && ctx.paragraph
     return false
   }
   if (ctx.paragraph && marker[2] !== undefined && Number(marker[2]) !== 1) return false // prose
-  return openItem(ctx, indent, marker, (marker[0] ?? '').length === content.length)
+  let open = openItem(ctx, indent, marker, (marker[0] ?? '').length === content.length)
+  // A marker directly after a marker opens a nested item at the outer item's content column.
+  let rest = content.slice((marker[0] ?? '').length)
+  let inner = open ? LIST_MARKER.exec(rest) : null
+  while (inner && !THEMATIC_BREAK.test(rest)) {
+    open = openItem(ctx, ctx.offsets.at(-1) as number, inner, (inner[0] ?? '').length === rest.length)
+    rest = rest.slice((inner[0] ?? '').length)
+    inner = open ? LIST_MARKER.exec(rest) : null
+  }
+  // A rule inside the item is no paragraph.
+  if (THEMATIC_BREAK.test(rest)) ctx.paragraph = false
+  ctx.started = ctx.paragraph
+  return open
 }
 
 // What a line is: a list item, paragraph text, or a break (heading, rule,
@@ -330,28 +421,129 @@ const lineRole = (
   marker: RegExpExecArray | null,
   content: string,
 ): 'item' | 'text' | 'break' => {
-  if (!marker) return THEMATIC_OR_HEADING.test(content) ? 'break' : 'text'
+  if (!marker) {
+    // `===` under an open paragraph of the same container is a setext underline.
+    if (ctx.paragraph && indent >= (ctx.offsets.at(-1) ?? 0) && HEADING_EQUALS.test(content)) return 'break'
+    return THEMATIC_OR_HEADING.test(content) ? 'break' : 'text'
+  }
+  if (THEMATIC_BREAK.test(content)) return 'break'
   if ((marker[0] ?? '').length !== content.length || !ctx.paragraph) return 'item'
   if (indent < (ctx.offsets.at(-1) ?? 0)) return 'item'
   return marker[1] === '-' ? 'break' : 'text'
 }
 
+// How many lines after a box line an inline link may run over (a blank line ends it earlier).
+const LINK_MAX_LINES = 8
+
+// Whether a line (after its quote markers and indent) starts a block of its own
+// and so cannot continue a paragraph.
+const opensBlock = (content: string): boolean => {
+  if (THEMATIC_OR_HEADING.test(content) || HEADING_UNDERLINE.test(content) || /^(?:`{3,}|~{3,})/.test(content)) return true
+  const marker = LIST_MARKER.exec(content)
+  // An empty item, or a numbered one that does not start at 1, cannot interrupt a paragraph.
+  return marker !== null && (marker[0] ?? '').length !== content.length && (marker[2] === undefined || Number(marker[2]) === 1)
+}
+
+// `rest` plus the lines under it up to the next blank one: an inline link may run
+// over lines. Only lines at the box line's quote depth continue it, and a line
+// that opens a new block ends it.
+const linkText = (lines: readonly string[], i: number, rest: string): string => {
+  const depthOf = (line: string): number => ((BLOCK_PREFIX.exec(line)?.[2] ?? '').match(/>/g) ?? []).length
+  const depth = depthOf(lines[i] as string)
+  let text = rest
+  for (let n = i + 1; n < Math.min(lines.length, i + 1 + LINK_MAX_LINES); n++) {
+    const line = (lines[n] as string).replace(/\r$/, '')
+    if (depthOf(line) !== depth) break
+    // The quote markers of a blockquoted link are not part of it.
+    const next = line.replace(BLOCK_PREFIX, '')
+    if (next.trim() === '' || opensBlock(next)) break
+    text += '\n' + next
+  }
+  return text
+}
+
+// Whether `text` starts with a well-formed inline link tail `(dest "title")`:
+// the destination is `<...>` or a run without blanks whose parens balance at any
+// depth, the title is `"..."`, `'...'` or `(...)`, and blanks (newlines too) may
+// sit between the parts.
+const isInlineLinkTail = (text: string): boolean => {
+  let p = 1
+  const skipBlanks = (): void => {
+    while (p < text.length && /\s/.test(text[p] as string)) p++
+  }
+  skipBlanks()
+  if (text[p] === '<') {
+    p++
+    while (p < text.length && !'<>\n'.includes(text[p] as string)) p += text[p] === '\\' ? 2 : 1
+    if (text[p] !== '>') return false
+    p++
+  } else {
+    let depth = 0
+    while (p < text.length && !/\s/.test(text[p] as string) && (depth > 0 || text[p] !== ')')) {
+      if (text[p] === '\\') p++
+      else if (text[p] === '(') depth++
+      else if (text[p] === ')') depth--
+      p++
+    }
+    if (depth !== 0) return false
+  }
+  const afterDest = p
+  skipBlanks()
+  if (text[p] === ')') return true
+  const close = ({ '"': '"', "'": "'", '(': ')' } as Record<string, string>)[text[p] as string]
+  if (p === afterDest || close === undefined) return false
+  for (p++; p < text.length && text[p] !== close; p += text[p] === '\\' ? 2 : 1) {
+    if (close === ')' && text[p] === '(') return false
+  }
+  if (p >= text.length) return false
+  p++
+  skipBlanks()
+  return text[p] === ')'
+}
+
+// Whether the text right after `[m]` makes the marker a link (an `<a>`, no box):
+// an inline `(dest)`, a `[label]` / `[]` that names a defined link, or a defined
+// shortcut `[m]` (also what a malformed inline tail or label falls back to).
+// `][[` is a link only through that shortcut: a wikilink is flattened to text first.
+const isLinkTail = (rest: string, mark: string, definitions: ReadonlySet<string>): boolean => {
+  if (rest.startsWith('[[')) return definitions.has(normalizeLabel(mark))
+  if (rest.startsWith('(') && isInlineLinkTail(rest)) return true
+  const label = rest.startsWith('[') ? LABEL_TAIL.exec(rest) : null
+  if (label) return definitions.has(normalizeLabel(label[1] === '' ? mark : (label[1] ?? '')))
+  return definitions.has(normalizeLabel(mark))
+}
+
 export type BoxCounts = { done: number; open: number; waived: number }
 
 export const countBoxes = (body: string): BoxCounts => {
-  const counts: BoxCounts = { done: 0, open: 0, waived: 0 }
-  const ctx: BlockContext = { depth: 0, paragraph: false, offsets: [] }
+  const lines = body.split('\n')
+  const found: Array<{ i: number; mark: string; rest: string; heading?: boolean }> = []
+  // The box on the line that opened the current paragraph, if it has one.
+  let first: (typeof found)[number] | undefined
+  const definitions = new Set<string>()
+  const ctx: BlockContext = { depth: 0, paragraph: false, offsets: [], titleNext: false, lazy: false, started: false, heading: false }
   let fence: Fence | null = null
-  for (const line of body.split('\n')) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] as string
     const step = nextFence(fence, line.trimStart().replace(/\r$/, ''))
     fence = step.fence
     if (step.skip) {
-      ctx.paragraph = false
+      Object.assign(ctx, { paragraph: false, opener: undefined, titleNext: false, lazy: false })
       continue
     }
-    if (!isListItem(ctx, line)) continue
-    const mark = CHECKBOX_LINE.exec(line)?.[2]
-    if (mark === undefined) continue
+    const item = isListItem(ctx, line)
+    if (ctx.definition) definitions.add(ctx.definition)
+    // A setext underline makes the paragraph's first line heading text: no box there.
+    if (ctx.heading && first) first.heading = true
+    const m = item ? CHECKBOX_LINE.exec(line) : null
+    const box = m ? { i, mark: m[2] as string, rest: line.slice(m[0].length).replace(/\r$/, '') } : undefined
+    if (box) found.push(box)
+    if (ctx.started) first = box
+  }
+  // Definitions may come after the box, so links are judged once the whole note is read.
+  const counts: BoxCounts = { done: 0, open: 0, waived: 0 }
+  for (const { i, mark, rest, heading } of found) {
+    if (heading || isLinkTail(rest.startsWith('(') ? linkText(lines, i, rest) : rest, mark, definitions)) continue
     if (mark === ' ') counts.open++
     else if (mark === '~') counts.waived++
     else counts.done++
