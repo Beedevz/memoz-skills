@@ -267,8 +267,10 @@ export const lastLogDate = (body: string): string | null => {
 // An item whose first line is empty (`-` alone) takes its text from the next
 // line when that sits at the item's content column (a blank line between, or a
 // line left of the column, ends the item): a box there is a box.
-// Known limits (each needs a full parser): a definition opening a list item
-// (`- [a]: x`), a link spanning more than `LINK_MAX_LINES` lines.
+// Known limits (each needs a full parser): a multi-line definition (`[a]:` with its
+// destination on the next line) at the start of an item or under an empty first line;
+// a blank line after a definition-only first block (the page keeps the item open);
+// a link spanning more than `LINK_MAX_LINES` lines.
 const CHECKBOX_LINE = /^([ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)*(?:[-*+]|\d{1,9}[.)])[ \t]+\[)([ xX~])(\])/
 // The box on the first text line of an item whose own first line is empty: no
 // marker (the scanner has checked the line sits at the item's content column).
@@ -355,6 +357,14 @@ const boxPattern = (ctx: BlockContext, item: boolean): RegExp | null => {
   return item ? CHECKBOX_LINE : null
 }
 
+// A text line at a block start: records a one-line definition, or the opener of a multi-line one.
+const startDefinition = (ctx: BlockContext, content: string): boolean => {
+  const definition = labelMatch(LINK_DEFINITION, content)
+  if (definition) Object.assign(ctx, { definition: normalizeLabel(definition[1] ?? ''), titleNext: definition[2] === undefined })
+  else ctx.opener = normalizeLabel(labelMatch(DEFINITION_OPENER, content)?.[1] ?? '') || undefined
+  return definition !== null
+}
+
 // Whether `rawLine` starts a list item, and the context that follows from it.
 const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
   ctx.definition = undefined
@@ -383,11 +393,15 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
     const dest = DEFINITION_DEST_LINE.exec(content)
     if (dest) {
       Object.assign(ctx, { definition: opener, paragraph: false, titleNext: dest[1] === undefined })
+      if (pending > 0) ctx.empty = pending
       return false
     }
   }
   if (!marker && titleNext && DEFINITION_TITLE_LINE.test(content)) {
     ctx.paragraph = false
+    // A title on its own line after a definition under an empty first line: still no text (left of
+    // the item's column it is a lazy line of the definition: the item goes on).
+    if (pending > 0) ctx.empty = pending
     return false
   }
   // Decided before `closeItems` below changes the open items.
@@ -406,12 +420,12 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
     const blockStart = textLine && !ctx.paragraph && !lazyText
     // `===` / `---` under an open paragraph of its own container turns it into a heading.
     ctx.heading = role === 'break' && ctx.paragraph && indent >= (ctx.offsets.at(-1) ?? 0) && HEADING_UNDERLINE.test(content)
-    const definition = blockStart ? labelMatch(LINK_DEFINITION, content) : null
-    if (definition) Object.assign(ctx, { definition: normalizeLabel(definition[1] ?? ''), titleNext: definition[2] === undefined })
-    else if (blockStart) ctx.opener = normalizeLabel(labelMatch(DEFINITION_OPENER, content)?.[1] ?? '') || undefined
+    const definition = blockStart && startDefinition(ctx, content)
     ctx.lazy = lazyText
     ctx.paragraph = textLine && !definition && !lazyText
     ctx.started = blockStart && ctx.paragraph
+    // A definition is no text: the next line is still the item's first text line.
+    if (ctx.cont && ctx.definition) ctx.empty = pending
     return false
   }
   if (ctx.paragraph && marker[2] !== undefined && Number(marker[2]) !== 1) return false // prose
@@ -424,11 +438,13 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
     rest = rest.slice((inner[0] ?? '').length)
     inner = open ? LIST_MARKER.exec(rest) : null
   }
-  // A rule inside the item is no paragraph.
-  if (THEMATIC_BREAK.test(rest)) ctx.paragraph = false
+  // A rule inside the item is no paragraph; neither is a definition (a block start, after the marker too).
+  const defined = open && startDefinition(ctx, rest)
+  if (THEMATIC_BREAK.test(rest) || defined) ctx.paragraph = false
   ctx.started = ctx.paragraph
   // The marker was alone on its line: the item's text, if any, starts on the next one.
-  if (open && rest === '') ctx.empty = ctx.offsets.at(-1) ?? 0
+  // A one-line definition after the marker is no text either: the same goes for the line after it.
+  if (open && (rest === '' || defined)) ctx.empty = ctx.offsets.at(-1) ?? 0
   return open
 }
 
