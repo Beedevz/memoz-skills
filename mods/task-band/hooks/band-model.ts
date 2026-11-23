@@ -267,8 +267,10 @@ export const lastLogDate = (body: string): string | null => {
 // An item whose first line is empty (`-` alone) takes its text from the next
 // line when that sits at the item's content column (a blank line between, or a
 // line left of the column, ends the item): a box there is a box.
-// Known limits (each needs a full parser): a definition opening a list item
-// (`- [a]: x`), a link spanning more than `LINK_MAX_LINES` lines.
+// Known limits (each needs a full parser): a multi-line definition (`[a]:` with its
+// destination on the next line) at the start of an item or under an empty first line;
+// a blank line after a definition-only first block (the page keeps the item open);
+// a link spanning more than `LINK_MAX_LINES` lines.
 const CHECKBOX_LINE = /^([ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)*(?:[-*+]|\d{1,9}[.)])[ \t]+\[)([ xX~])(\])/
 // The box on the first text line of an item whose own first line is empty: no
 // marker (the scanner has checked the line sits at the item's content column).
@@ -391,14 +393,15 @@ const isListItem = (ctx: BlockContext, rawLine: string): boolean => {
     const dest = DEFINITION_DEST_LINE.exec(content)
     if (dest) {
       Object.assign(ctx, { definition: opener, paragraph: false, titleNext: dest[1] === undefined })
-      if (pending > 0 && indent >= pending) ctx.empty = pending
+      if (pending > 0) ctx.empty = pending
       return false
     }
   }
   if (!marker && titleNext && DEFINITION_TITLE_LINE.test(content)) {
     ctx.paragraph = false
-    // A title on its own line after a definition under an empty first line: still no text.
-    if (pending > 0 && indent >= pending) ctx.empty = pending
+    // A title on its own line after a definition under an empty first line: still no text (left of
+    // the item's column it is a lazy line of the definition: the item goes on).
+    if (pending > 0) ctx.empty = pending
     return false
   }
   // Decided before `closeItems` below changes the open items.

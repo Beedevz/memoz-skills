@@ -406,6 +406,24 @@ export default {
       }
     },
     {
+      "name": "an own-line title left of the item column still continues an empty-first-line item",
+      "note": "---\nstatus: doing\n---\n-\n  [a]: http://x\n\"t\"\n  [ ] y\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
+      "name": "an own-line title left of the item column after a marker-line definition",
+      "note": "---\nstatus: doing\n---\n- [a]: http://x\n\"t\"\n  [ ] y\n- [ ] b\n",
+      "expected": {
+        "done": 0,
+        "open": 2,
+        "waived": 0
+      }
+    },
+    {
       "name": "`[x][]` with a defined label is a link, not a box",
       "note": "---\nstatus: doing\n---\n[x]: https://example.com\n\n- [x][] b\n- [ ] c\n",
       "expected": {
