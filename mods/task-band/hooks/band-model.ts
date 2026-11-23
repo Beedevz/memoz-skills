@@ -571,9 +571,13 @@ export const countBoxes = (body: string): BoxCounts => {
   let fence: Fence | null = null
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] as string
-    const step = nextFence(fence, line.trimStart().replace(/\r$/, ''))
+    const opening = fence === null
+    const bare = line.trimStart().replace(/\r$/, '')
+    const step = nextFence(fence, bare)
     fence = step.fence
     if (step.skip) {
+      // A fence left of an open item's content column ends the item (a fence inside it stays inside).
+      if (opening) closeItems(ctx, indentWidth(line.slice(0, line.length - line.trimStart().length)))
       Object.assign(ctx, { paragraph: false, opener: undefined, titleNext: false, lazy: false, empty: 0, bare: false })
       continue
     }

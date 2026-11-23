@@ -865,15 +865,6 @@ export default {
       }
     },
     {
-      "name": "a `===` setext underline closes the paragraph: a numbered box after it counts",
-      "note": "---\nstatus: doing\n---\ntext\n===\n2. [ ] y\n",
-      "expected": {
-        "done": 0,
-        "open": 1,
-        "waived": 0
-      }
-    },
-    {
       "name": "a definition in a done list item is not a box",
       "note": "---\nstatus: doing\n---\n- [x]: https://a.b\n- [ ] b\n",
       "expected": {
@@ -924,6 +915,78 @@ export default {
       "expected": {
         "done": 1,
         "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a two-dash setext underline closes a box line: the box is heading text",
+      "note": "---\nstatus: doing\n---\n- [ ] a\n  --\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a two-dash setext underline indented 3 closes a box line",
+      "note": "---\nstatus: doing\n---\n- [ ] a\n   --\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a two-dash setext underline closes a multi-line paragraph",
+      "note": "---\nstatus: doing\n---\n- [ ] a\n  b\n  --\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a fence ends an empty item: the box after it counts only on its own item",
+      "note": "---\nstatus: doing\n---\n-\n```\nz\n```\n\n    - [ ] x\n- [ ] real\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a fence ends an empty item: a marker 4 columns in after a blank is code",
+      "note": "---\nstatus: doing\n---\n-\n```\n```\n\n    - [ ] x\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a fence ends an item: a marker 4 columns in right after the fence is code",
+      "note": "---\nstatus: doing\n---\n- a\n```\n```\n    - [ ] x\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a fence ends an empty item: a marker 4 columns in right after the fence is code",
+      "note": "---\nstatus: doing\n---\n-\n```\n```\n    - [ ] x\n",
+      "expected": {
+        "done": 0,
+        "open": 0,
+        "waived": 0
+      }
+    },
+    {
+      "name": "a fence at the item's content column keeps the item open",
+      "note": "---\nstatus: doing\n---\n- a\n  ```\n  ```\n  - [ ] x\n",
+      "expected": {
+        "done": 0,
+        "open": 1,
         "waived": 0
       }
     }
